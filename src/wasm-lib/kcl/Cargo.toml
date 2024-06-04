@@ -44,7 +44,7 @@ url = { version = "2.5.0", features = ["serde"] }
 uuid = { version = "1.8.0", features = ["v4", "js", "serde"] }
 validator = { version = "0.18.1", features = ["derive"] }
 winnow = "0.5.40"
-zip = { version = "2.0.0", default-features = false }
+zip = { version = "2.1.2", default-features = false }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 js-sys = { version = "0.3.69" }
@@ -58,7 +58,7 @@ web-sys = { version = "0.3.69", features = ["console"] }
 approx = "0.5"
 bson = { version = "2.10.0", features = ["uuid-1", "chrono"] }
 tokio = { version = "1.37.0", features = ["full"] }
-tokio-tungstenite = { version = "0.21.0", features = ["rustls-tls-native-roots"] }
+tokio-tungstenite = { version = "0.23.0", features = ["rustls-tls-native-roots"] }
 tower-lsp = { version = "0.20.0", features = ["proposed"] }
 
 [features]
@@ -79,7 +79,7 @@ convert_case = "0.6.0"
 criterion = "0.5.1"
 expectorate = "1.1.0"
 iai = "0.1"
-image = "0.24.9"
+image = "0.25.1"
 insta = { version = "1.38.0", features = ["json"] }
 itertools = "0.13.0"
 pretty_assertions = "1.4.0"
