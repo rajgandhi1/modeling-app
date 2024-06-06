@@ -43,6 +43,8 @@ import {
   closeBracketsKeymap,
   completionKeymap,
 } from '@codemirror/autocomplete'
+import { vim } from "@replit/codemirror-vim"
+import { Vim, getCM } from "@replit/codemirror-vim"
 
 export const editorShortcutMeta = {
   formatCode: {
@@ -170,6 +172,10 @@ export const KclEditorPane = () => {
         })
       )
       if (textWrapping.current) extensions.push(EditorView.lineWrapping)
+      
+      // TODO: add a dedicated setting
+      // TODO: figure out why this breaks the stream
+      if (true) extensions.push(vim())
     }
 
     return extensions
@@ -193,7 +199,12 @@ export const KclEditorPane = () => {
         extensions={editorExtensions}
         theme={theme}
         onCreateEditor={(_editorView) =>
-          editorManager.setEditorView(_editorView)
+          {
+            const cm = getCM(_editorView)
+            // Make sure insert mode is on by default
+            Vim.handleKey(cm, "i")
+            editorManager.setEditorView(_editorView)
+          }
         }
         indentWithTab={false}
         basicSetup={false}
