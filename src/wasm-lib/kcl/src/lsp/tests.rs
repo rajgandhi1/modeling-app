@@ -863,7 +863,10 @@ async fn test_kcl_lsp_completions_sketch_group_tags() {
   |> line([-33.24, 14.55], %)
   |> close(%)
 
-part001."#
+part001.
+
+# some other stuffs here
+const thing = 1"#
                     .to_string(),
             },
         })
