@@ -696,6 +696,214 @@ async fn test_kcl_lsp_completions_empty_in_comment() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_kcl_lsp_completions_extrude_group_tags() {
+    let server = kcl_lsp_server(false).await.unwrap();
+
+    // Send open file.
+    server
+        .did_open(tower_lsp::lsp_types::DidOpenTextDocumentParams {
+            text_document: tower_lsp::lsp_types::TextDocumentItem {
+                uri: "file:///test.kcl".try_into().unwrap(),
+                language_id: "kcl".to_string(),
+                version: 1,
+                text: r#"const part001 = startSketchOn('XY')
+  |> startProfileAt([11.19, 28.35], %)
+  |> line([28.67, -13.25], %, $here)
+  |> line([-4.12, -22.81], %)
+  |> line([-33.24, 14.55], %)
+  |> close(%)
+  |> extrude(5, %)
+
+part001."#
+                    .to_string(),
+            },
+        })
+        .await;
+
+    // Send completion request.
+    let completions = server
+        .completion(tower_lsp::lsp_types::CompletionParams {
+            text_document_position: tower_lsp::lsp_types::TextDocumentPositionParams {
+                text_document: tower_lsp::lsp_types::TextDocumentIdentifier {
+                    uri: "file:///test.kcl".try_into().unwrap(),
+                },
+                position: tower_lsp::lsp_types::Position { line: 8, character: 8 },
+            },
+            context: None,
+            partial_result_params: Default::default(),
+            work_done_progress_params: Default::default(),
+        })
+        .await
+        .unwrap()
+        .unwrap();
+
+    // Check the completions.
+    if let tower_lsp::lsp_types::CompletionResponse::Array(completions) = completions {
+        assert!(completions.len() > 10);
+        // Make sure that `here` is in the completions.
+        let const_completion = completions
+            .iter()
+            .find(|completion| completion.label == "sketchGroup")
+            .unwrap();
+        assert_eq!(
+            const_completion.kind,
+            Some(tower_lsp::lsp_types::CompletionItemKind::REFERENCE)
+        );
+    } else {
+        panic!("Expected array of completions");
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_kcl_lsp_completions_member_expression() {
+    let server = kcl_lsp_server(false).await.unwrap();
+
+    // Send open file.
+    server
+        .did_open(tower_lsp::lsp_types::DidOpenTextDocumentParams {
+            text_document: tower_lsp::lsp_types::TextDocumentItem {
+                uri: "file:///test.kcl".try_into().unwrap(),
+                language_id: "kcl".to_string(),
+                version: 1,
+                text: r#"const thing = {foo: "blah"} 
+
+thing"#
+                    .to_string(),
+            },
+        })
+        .await;
+
+    // Send completion request.
+    let completions = server
+        .completion(tower_lsp::lsp_types::CompletionParams {
+            text_document_position: tower_lsp::lsp_types::TextDocumentPositionParams {
+                text_document: tower_lsp::lsp_types::TextDocumentIdentifier {
+                    uri: "file:///test.kcl".try_into().unwrap(),
+                },
+                position: tower_lsp::lsp_types::Position { line: 2, character: 4 },
+            },
+            context: None,
+            partial_result_params: Default::default(),
+            work_done_progress_params: Default::default(),
+        })
+        .await
+        .unwrap()
+        .unwrap();
+
+    // Check the completions.
+    if let tower_lsp::lsp_types::CompletionResponse::Array(completions) = completions {
+        assert!(completions.len() > 10);
+        // Make sure that `here` is in the completions.
+        let const_completion = completions.iter().find(|completion| completion.label == "foo");
+        assert_eq!(const_completion, None);
+    } else {
+        panic!("Expected array of completions");
+    }
+
+    // Send open file.
+    server
+        .did_open(tower_lsp::lsp_types::DidOpenTextDocumentParams {
+            text_document: tower_lsp::lsp_types::TextDocumentItem {
+                uri: "file:///test.kcl".try_into().unwrap(),
+                language_id: "kcl".to_string(),
+                version: 1,
+                text: r#"const thing = {foo: "blah"} 
+
+thing."#
+                    .to_string(),
+            },
+        })
+        .await;
+
+    // Send completion request.
+    let completions = server
+        .completion(tower_lsp::lsp_types::CompletionParams {
+            text_document_position: tower_lsp::lsp_types::TextDocumentPositionParams {
+                text_document: tower_lsp::lsp_types::TextDocumentIdentifier {
+                    uri: "file:///test.kcl".try_into().unwrap(),
+                },
+                position: tower_lsp::lsp_types::Position { line: 2, character: 5 },
+            },
+            context: None,
+            partial_result_params: Default::default(),
+            work_done_progress_params: Default::default(),
+        })
+        .await
+        .unwrap()
+        .unwrap();
+
+    // Check the completions.
+    if let tower_lsp::lsp_types::CompletionResponse::Array(completions) = completions {
+        assert!(completions.len() > 10);
+        let const_completion = completions.iter().find(|completion| completion.label == "foo").unwrap();
+        assert_eq!(
+            const_completion.kind,
+            Some(tower_lsp::lsp_types::CompletionItemKind::PROPERTY)
+        );
+    } else {
+        panic!("Expected array of completions");
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_kcl_lsp_completions_sketch_group_tags() {
+    let server = kcl_lsp_server(false).await.unwrap();
+
+    // Send open file.
+    server
+        .did_open(tower_lsp::lsp_types::DidOpenTextDocumentParams {
+            text_document: tower_lsp::lsp_types::TextDocumentItem {
+                uri: "file:///test.kcl".try_into().unwrap(),
+                language_id: "kcl".to_string(),
+                version: 1,
+                text: r#"const part001 = startSketchOn('XY')
+  |> startProfileAt([11.19, 28.35], %)
+  |> line([28.67, -13.25], %, $here)
+  |> line([-4.12, -22.81], %)
+  |> line([-33.24, 14.55], %)
+  |> close(%)
+
+part001."#
+                    .to_string(),
+            },
+        })
+        .await;
+
+    // Send completion request.
+    let completions = server
+        .completion(tower_lsp::lsp_types::CompletionParams {
+            text_document_position: tower_lsp::lsp_types::TextDocumentPositionParams {
+                text_document: tower_lsp::lsp_types::TextDocumentIdentifier {
+                    uri: "file:///test.kcl".try_into().unwrap(),
+                },
+                position: tower_lsp::lsp_types::Position { line: 7, character: 8 },
+            },
+            context: None,
+            partial_result_params: Default::default(),
+            work_done_progress_params: Default::default(),
+        })
+        .await
+        .unwrap()
+        .unwrap();
+
+    // Check the completions.
+    if let tower_lsp::lsp_types::CompletionResponse::Array(completions) = completions {
+        assert!(completions.len() > 10);
+        // Make sure that `here` is in the completions.
+        let const_completion = completions
+            .iter()
+            .find(|completion| completion.label == "tags")
+            .unwrap();
+        assert_eq!(
+            const_completion.kind,
+            Some(tower_lsp::lsp_types::CompletionItemKind::REFERENCE)
+        );
+    } else {
+        panic!("Expected array of completions");
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_kcl_lsp_completions_tags() {
     let server = kcl_lsp_server(false).await.unwrap();
 

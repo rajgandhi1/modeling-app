@@ -263,6 +263,11 @@ impl Program {
         None
     }
 
+    /// Get the member expression completions for the given position.
+    pub fn get_member_expression_completions_for_position(&self, pos: usize) -> Option<Vec<CompletionItem>> {
+        None
+    }
+
     /// Returns a value that includes the given character position.
     /// This is a bit more recursive than `get_body_item_for_position`.
     pub fn get_value_for_position(&self, pos: usize) -> Option<&Value> {

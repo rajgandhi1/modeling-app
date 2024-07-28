@@ -1061,13 +1061,23 @@ impl LanguageServer for Backend {
             return Ok(None);
         }
 
-        // Get the completion items forem the ast.
+        // Get the completion items from the ast.
         let Ok(variables) = ast.completion_items() else {
             return Ok(Some(CompletionResponse::Array(completions)));
         };
 
         // Get our variables from our AST to include in our completions.
         completions.extend(variables);
+
+        // Get the value for the position.
+        let Some(properties) = ast.get_member_expression_completions_for_position(position) else {
+            return Ok(Some(CompletionResponse::Array(completions)));
+        };
+
+        // Make sure the properties are at the start of the completion list.
+        completions.extend(properties);
+
+        println!("value: {:?}", value);
 
         Ok(Some(CompletionResponse::Array(completions)))
     }
