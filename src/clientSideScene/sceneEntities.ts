@@ -607,11 +607,13 @@ export class SceneEntities {
     const _node1 = getNodeFromPath<VariableDeclaration>(
       _ast,
       sketchPathToNode || [],
-      'VariableDeclaration'
-    )
+      ['VariableDeclaration', 'ExpressionStatement']
+    ) as { node: { type: string } } | Error
     if (trap(_node1)) return Promise.reject(_node1)
     const variableDeclarationName =
-      _node1.node?.declarations?.[0]?.id?.name || ''
+      _node1.node.type === 'VariableDeclaration'
+        ? (_node1.node as VariableDeclaration).declarations[0]?.id?.name || ''
+        : ''
 
     const sg = sketchGroupFromKclValue(
       kclManager.programMemory.get(variableDeclarationName),
