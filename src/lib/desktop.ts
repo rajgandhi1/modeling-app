@@ -443,7 +443,18 @@ export const readAppSettingsFile = async () => {
   }
   const configToml = await window.electron.readFile(settingsPath)
   const configObj = parseAppSettings(configToml)
-  const overrideJSON = localStorage.getItem('APP_SETTINGS_OVERRIDE')
+  const overrideJSON = window?.env?.[TEST_SETTINGS_FILE_KEY]
+  console.log(
+    'overrideJSON',
+    overrideJSON,
+    window.electron,
+    window.electron.process?.env,
+    window.electron.process?.env?.TEST_SETTINGS_FILE_KEY,
+    window.electron.process?.env?.TEST_SETTINGS_FILE_KEY?.(),
+    window.electron.process?.env?.BASE_URL?.()
+    // window.electron.process?.env?.BASE_URL
+  )
+  // const overrideJSON = localStorage.getItem('APP_SETTINGS_OVERRIDE')
   if (overrideJSON) {
     try {
       const override = JSON.parse(overrideJSON)

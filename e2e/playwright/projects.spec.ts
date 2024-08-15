@@ -7,7 +7,7 @@ test.afterEach(async ({ page }, testInfo) => {
 })
 
 test(
-  'CRUD projects',
+  'Rename and delete projects, also spam arrow keys when renaming',
   { tag: '@electron' },
   async ({ browserName }, testInfo) => {
     const { electronApp, page } = await setupElectron({

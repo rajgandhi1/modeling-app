@@ -640,20 +640,20 @@ export async function setup(
       token,
       settingsKey,
       settings,
-      appSettingsFileKey,
-      appSettingsFileContent,
+      // appSettingsFileKey,
+      // appSettingsFileContent,
     }) => {
       localStorage.setItem('TOKEN_PERSIST_KEY', token)
       localStorage.setItem('persistCode', ``)
       localStorage.setItem(settingsKey, settings)
-      localStorage.setItem(appSettingsFileKey, appSettingsFileContent)
+      // localStorage.setItem(appSettingsFileKey, appSettingsFileContent)
       localStorage.setItem('playwright', 'true')
     },
     {
       token: secrets.token,
-      appSettingsFileKey: TEST_SETTINGS_FILE_KEY,
-      appSettingsFileContent:
-        overrideDirectory || TEST_SETTINGS.app.projectDirectory,
+      // appSettingsFileKey: TEST_SETTINGS_FILE_KEY,
+      // appSettingsFileContent:
+      //   overrideDirectory || TEST_SETTINGS.app.projectDirectory,
       settingsKey: TEST_SETTINGS_KEY,
       settings: TOML.stringify({
         ...TEST_SETTINGS,
@@ -672,9 +672,11 @@ export async function setup(
 export async function setupElectron({
   testInfo,
   folderSetupFn,
+  overrideDirectory,
 }: {
   testInfo: TestInfo
   folderSetupFn?: (projectDirName: string) => Promise<void>
+  overrideDirectory?: string
 }) {
   // create or otherwise clear the folder
   const projectDirName = testInfo.outputPath('electron-test-projects-dir')
@@ -688,7 +690,14 @@ export async function setupElectron({
 
   await fsp.mkdir(projectDirName)
 
-  const electronApp = await electron.launch({ args: ['.', '--no-sandbox'] })
+  const electronApp = await electron.launch({
+    args: ['.', '--no-sandbox'],
+    env: {
+      ...process.env,
+      TEST_SETTINGS_FILE_KEY:
+        overrideDirectory || TEST_SETTINGS.app.projectDirectory,
+    },
+  })
   const context = electronApp.context()
   const page = await electronApp.firstWindow()
   context.on('console', console.log)

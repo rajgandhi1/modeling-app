@@ -1,9 +1,11 @@
 import { ipcRenderer, contextBridge } from 'electron'
 import path from 'path'
 import fs from 'node:fs/promises'
-import packageJson from '../../package.json'
+import packageJson from '../package.json'
 import { components } from 'lib/machine-api'
 import { MachinesListing } from 'lib/machineManager'
+
+console.log('preload.ts loaded', packageJson)
 
 const open = (args: any) => ipcRenderer.invoke('dialog.showOpenDialog', args)
 const save = (args: any) => ipcRenderer.invoke('dialog.showSaveDialog', args)
@@ -81,7 +83,11 @@ contextBridge.exposeInMainWorld('electron', {
   process: {
     // Setter/getter has to be created because
     // these are read-only over the boundary.
-    env: Object.assign({}, exposeProcessEnv('BASE_URL')),
+    env: Object.assign(
+      {},
+      exposeProcessEnv('BASE_URL'),
+      exposeProcessEnv('TEST_SETTINGS_FILE_KEY')
+    ),
   },
   kittycad,
   listMachines,

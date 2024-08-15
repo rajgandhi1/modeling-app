@@ -43,7 +43,10 @@ export type Events =
 const COOKIE_NAME = '__Secure-next-auth.session-token'
 export const TOKEN_PERSIST_KEY = 'TOKEN_PERSIST_KEY'
 const persistedToken =
-  getCookie(COOKIE_NAME) || localStorage?.getItem(TOKEN_PERSIST_KEY) || ''
+  VITE_KC_DEV_TOKEN ||
+  getCookie(COOKIE_NAME) ||
+  localStorage?.getItem(TOKEN_PERSIST_KEY) ||
+  ''
 
 export const authMachine = createMachine<UserContext, Events>(
   {
@@ -59,6 +62,7 @@ export const authMachine = createMachine<UserContext, Events>(
             {
               target: 'loggedIn',
               actions: () => {
+                console.log('login and shit')
                 return assign((context, event) => ({
                   user: event.data.user,
                   token: event.data.token || context.token,
@@ -70,6 +74,7 @@ export const authMachine = createMachine<UserContext, Events>(
             {
               target: 'loggedOut',
               actions: (args) => {
+                console.log('logout')
                 return assign({
                   user: () => undefined,
                 })
@@ -118,12 +123,14 @@ export const authMachine = createMachine<UserContext, Events>(
 )
 
 async function getUser(context: UserContext) {
-  const token =
-    context.token && context.token !== ''
-      ? context.token
-      : getCookie(COOKIE_NAME) ||
-        localStorage?.getItem(TOKEN_PERSIST_KEY) ||
-        VITE_KC_DEV_TOKEN
+  console.log('getUser context', VITE_KC_DEV_TOKEN, context)
+  const token = VITE_KC_DEV_TOKEN
+    ? VITE_KC_DEV_TOKEN
+    : context.token && context.token !== ''
+    ? context.token
+    : VITE_KC_DEV_TOKEN ||
+      getCookie(COOKIE_NAME) ||
+      localStorage?.getItem(TOKEN_PERSIST_KEY)
   const url = withBaseURL('/user')
   const headers: { [key: string]: string } = {
     'Content-Type': 'application/json',
@@ -138,6 +145,10 @@ async function getUser(context: UserContext) {
       LOCAL_USER.image = ''
     }
 
+    console.log('skip', {
+      user: LOCAL_USER,
+      token,
+    })
     return {
       user: LOCAL_USER,
       token,
