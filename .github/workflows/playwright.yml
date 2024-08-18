@@ -56,21 +56,21 @@ jobs:
     - name: Install dependencies
       shell: bash
       run: yarn
-    - name: Cache Playwright Browsers
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cache/ms-playwright/
-        key: ${{ runner.os }}-playwright-${{ hashFiles('yarn.lock') }}
-    - name: Install Playwright Browsers
-      shell: bash
-      if:  ${{ !startsWith(matrix.os, 'macos') }}
-      run: yarn playwright install --with-deps
-    - name: install chrome from the cask macos
-      if:  ${{ startsWith(matrix.os, 'macos') }}
-      shell: bash
-      run: |
-        brew install --cask google-chrome
+    # - name: Cache Playwright Browsers
+    #   uses: actions/cache@v4
+    #   with:
+    #     path: |
+    #       ~/.cache/ms-playwright/
+    #     key: ${{ runner.os }}-playwright-${{ hashFiles('yarn.lock') }}
+    # - name: Install Playwright Browsers
+    #   shell: bash
+    #   if:  ${{ !startsWith(matrix.os, 'macos') }}
+    #   run: yarn playwright install --with-deps
+    # - name: install chrome from the cask macos
+    #   if:  ${{ startsWith(matrix.os, 'macos') }}
+    #   shell: bash
+    #   run: |
+    #     brew install --cask google-chrome
     - name: Download Wasm Cache
       id: download-wasm
       if: needs.check-rust-changes.outputs.rust-changed == 'false'
@@ -99,12 +99,12 @@ jobs:
       uses: Swatinem/rust-cache@v2
       with:
         workspaces: './src/wasm-lib'
-    - name: install good sed
-      if:  ${{ startsWith(matrix.os, 'macos') }}
-      shell: bash
-      run: |
-        brew install gnu-sed
-        echo "/opt/homebrew/opt/gnu-sed/libexec/gnubin" >> $GITHUB_PATH
+    # - name: install good sed
+    #   if:  ${{ startsWith(matrix.os, 'macos') }}
+    #   shell: bash
+    #   run: |
+    #     brew install gnu-sed
+    #     echo "/opt/homebrew/opt/gnu-sed/libexec/gnubin" >> $GITHUB_PATH
     - name: Install vector
       shell: bash
       if:  ${{ !startsWith(matrix.os, 'windows') }}
