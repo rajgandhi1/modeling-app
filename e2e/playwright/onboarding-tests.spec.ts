@@ -131,7 +131,7 @@ test.describe('Onboarding tests', () => {
     await expect(page.url()).not.toContain('onboarding')
   })
 
-  test('Onboarding redirects and code updating', async ({ page }) => {
+  test('Onboarding redirects and code updating @focus', async ({ page }) => {
     const u = await getUtils(page)
 
     // Override beforeEach test setup
