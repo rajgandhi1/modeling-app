@@ -193,7 +193,7 @@ jobs:
       if: ${{ !cancelled() && (success() || failure()) }}
       shell: bash
       run: |
-        yarn playwright test --project="chromium" --config=playwright.ci.config.ts --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }} --grep="@focus" --grep-invert="@snapshot|@electron" || true
+        yarn playwright test --project="Google Chrome" --config=playwright.ci.config.ts --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }} --grep="@focus" --grep-invert="@snapshot|@electron" || true
         # if [[ ! -f "test-results/.last-run.json" ]]; then
         #     # if no last run artifact, than run plawright normally
         #     echo "run playwright normally"

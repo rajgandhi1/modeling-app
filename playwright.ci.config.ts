@@ -42,20 +42,14 @@ export default defineConfig({
           /* Chromium is the only one with these permission types */
           permissions: ['clipboard-write', 'clipboard-read'],
         },
+        launchOptions: {
+          args: process.env.CI ? ['--enable-gpu'] : [],
+        },
       }, // or 'chrome-beta'
     },
     {
       name: 'webkit',
       use: { ...devices['Desktop Safari'] },
-    },
-    {
-      name: 'chromium',
-      use: {
-        ...devices['Desktop Chrome'],
-        launchOptions: {
-          args: ['--enable-gpu'],
-        },
-      },
     },
   ],
 
