@@ -61,6 +61,7 @@ where
     Ok(state)
 }
 
+#[derive(Default)]
 struct Printer;
 
 impl Compose for Vec<String> {
@@ -254,5 +255,25 @@ where
         BinaryPart::CallExpression(expr) => visitor.visit_call_expr(expr),
         BinaryPart::MemberExpression(expr) => visitor.visit_member_expr(expr),
         BinaryPart::UnaryExpression(expr) => visitor.visit_unary_expr(expr),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_printer() {
+        let code = include_str!("../../tests/executor/inputs/cube.kcl");
+        let tokens = crate::token::lexer(code).unwrap();
+        let parser = crate::parser::Parser::new(tokens);
+        let program = parser.ast().unwrap();
+        let logs = match traverse(Printer::default(), program) {
+            Ok(x) => x,
+            Err(e) => match e {},
+        };
+        for log in logs {
+            println!("{log}");
+        }
     }
 }
