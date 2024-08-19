@@ -43,7 +43,7 @@ export default defineConfig({
           permissions: ['clipboard-write', 'clipboard-read'],
         },
         launchOptions: {
-          args: process.env.CI ? ['--enable-gpu'] : [],
+          args: process.env.CI ? ['--headless', '--enable-gpu'] : [],
         },
       }, // or 'chrome-beta'
     },
