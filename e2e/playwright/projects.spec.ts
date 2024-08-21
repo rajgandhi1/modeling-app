@@ -9,7 +9,7 @@ import {
 } from './test-utils'
 import fsp from 'fs/promises'
 import fs from 'fs'
-import { join } from 'path'
+import { join, resolve } from 'path'
 import { FILE_EXT } from 'lib/constants'
 
 test.afterEach(async ({ page }, testInfo) => {
@@ -54,10 +54,14 @@ test(
       folderSetupFn: async (dir) => {
         const bracketDir = join(dir, 'bracket')
         await fsp.mkdir(bracketDir, { recursive: true })
-        await fsp.copyFile(
-          join('src', 'wasm-lib', 'tests', 'executor', 'inputs', 'focusrite_scarlett_mounting_braket.kcl'),
-          join(bracketDir, 'main.kcl')
-        )
+        try {
+          const srcPath = resolve('src', 'wasm-lib', 'tests', 'executor', 'inputs', 'focusrite_scarlett_mounting_braket.kcl')
+          const destPath = join(bracketDir, 'main.kcl')
+          await fsp.copyFile(srcPath, destPath)
+          console.log(`Copied file from ${srcPath} to ${destPath}`)
+        } catch (error) {
+          console.error('Error copying file:', error)
+        }
       },
     })
 
