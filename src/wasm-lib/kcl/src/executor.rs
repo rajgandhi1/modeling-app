@@ -279,10 +279,6 @@ pub enum KclValue {
     Plane(Box<Plane>),
     Face(Box<Face>),
 
-    ExtrudeGroup(Box<ExtrudeGroup>),
-    ExtrudeGroups {
-        value: Vec<Box<ExtrudeGroup>>,
-    },
     ImportedGeometry(ImportedGeometry),
     #[ts(skip)]
     Function {
@@ -355,20 +351,14 @@ impl From<Vec<Box<SketchGroup>>> for KclValue {
 
 impl From<ExtrudeGroupSet> for KclValue {
     fn from(eg: ExtrudeGroupSet) -> Self {
-        match eg {
-            ExtrudeGroupSet::ExtrudeGroup(eg) => KclValue::ExtrudeGroup(eg),
-            ExtrudeGroupSet::ExtrudeGroups(egs) => KclValue::ExtrudeGroups { value: egs },
-        }
+        KclValue::UserVal(UserVal::set(eg.meta(), eg))
     }
 }
 
 impl From<Vec<Box<ExtrudeGroup>>> for KclValue {
     fn from(eg: Vec<Box<ExtrudeGroup>>) -> Self {
-        if eg.len() == 1 {
-            KclValue::ExtrudeGroup(eg[0].clone())
-        } else {
-            KclValue::ExtrudeGroups { value: eg }
-        }
+        let meta = eg.iter().flat_map(|eg| eg.meta.clone()).collect();
+        KclValue::UserVal(UserVal::set(meta, eg))
     }
 }
 
@@ -486,6 +476,15 @@ impl From<Box<SketchGroup>> for Vec<Box<SketchGroup>> {
 pub enum ExtrudeGroupSet {
     ExtrudeGroup(Box<ExtrudeGroup>),
     ExtrudeGroups(Vec<Box<ExtrudeGroup>>),
+}
+
+impl ExtrudeGroupSet {
+    pub fn meta(&self) -> Vec<Metadata> {
+        match self {
+            ExtrudeGroupSet::ExtrudeGroup(eg) => eg.meta.clone(),
+            ExtrudeGroupSet::ExtrudeGroups(eg) => eg.iter().flat_map(|eg| eg.meta.clone()).collect(),
+        }
+    }
 }
 
 impl From<ExtrudeGroup> for ExtrudeGroupSet {
@@ -755,11 +754,6 @@ impl From<KclValue> for Vec<SourceRange> {
             KclValue::UserVal(u) => u.meta.iter().map(|m| m.source_range).collect(),
             KclValue::TagDeclarator(t) => t.into(),
             KclValue::TagIdentifier(t) => t.meta.iter().map(|m| m.source_range).collect(),
-            KclValue::ExtrudeGroup(e) => e.meta.iter().map(|m| m.source_range).collect(),
-            KclValue::ExtrudeGroups { value } => value
-                .iter()
-                .flat_map(|eg| eg.meta.iter().map(|m| m.source_range))
-                .collect(),
             KclValue::ImportedGeometry(i) => i.meta.iter().map(|m| m.source_range).collect(),
             KclValue::Function { meta, .. } => meta.iter().map(|m| m.source_range).collect(),
             KclValue::Plane(p) => p.meta.iter().map(|m| m.source_range).collect(),
@@ -3205,9 +3199,8 @@ let w = f() + f()
 
     #[test]
     fn test_serialize_memory_item() {
-        let mem = KclValue::ExtrudeGroups {
-            value: Default::default(),
-        };
+        let eg = ExtrudeGroupSet::ExtrudeGroups(Vec::new());
+        let mem = KclValue::UserVal(UserVal::set(eg.meta(), eg));
         let json = serde_json::to_string(&mem).unwrap();
         assert_eq!(json, r#"{"type":"ExtrudeGroups","value":[]}"#);
     }
