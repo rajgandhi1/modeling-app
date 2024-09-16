@@ -253,11 +253,16 @@ async fn inner_y_line_to(
 }
 
 /// Draw a line.
-pub async fn line(_exec_state: &mut ExecState, args: Args) -> Result<KclValue, KclError> {
+pub async fn line(exec_state: &mut ExecState, args: Args) -> Result<KclValue, KclError> {
     let (delta, sketch_group, tag): ([f64; 2], SketchGroup, Option<TagDeclarator>) =
         args.get_data_and_sketch_group_and_tag()?;
 
     let new_sketch_group = inner_line(delta, sketch_group, tag, args).await?;
+    exec_state.put_artifact(
+        ArtifactId::new(new_sketch_group.id),
+        KclValue::new_user_val(new_sketch_group.meta.clone(), new_sketch_group.clone()),
+    );
+
     Ok(KclValue::new_user_val(new_sketch_group.meta.clone(), new_sketch_group))
 }
 
