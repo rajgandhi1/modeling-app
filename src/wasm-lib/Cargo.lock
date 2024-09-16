@@ -1430,6 +1430,7 @@ dependencies = [
  "databake",
  "derive-docs",
  "expectorate",
+ "fnv",
  "form_urlencoded",
  "futures",
  "git_rev",
