@@ -16,8 +16,8 @@ use crate::{
     ast::types::TagDeclarator,
     errors::{KclError, KclErrorDetails},
     executor::{
-        BasePath, ExecState, ExtrudeGroup, Face, GeoMeta, KclValue, Path, Plane, PlaneType, Point2d, Point3d,
-        SketchGroup, SketchGroupSet, SketchSurface, TagEngineInfo, TagIdentifier, UserVal,
+        ArtifactId, BasePath, ExecState, ExtrudeGroup, Face, GeoMeta, KclValue, Path, Plane, PlaneType, Point2d,
+        Point3d, SketchGroup, SketchGroupSet, SketchSurface, TagEngineInfo, TagIdentifier, UserVal,
     },
     std::{
         utils::{
@@ -93,11 +93,16 @@ pub enum StartOrEnd {
 }
 
 /// Draw a line to a point.
-pub async fn line_to(_exec_state: &mut ExecState, args: Args) -> Result<KclValue, KclError> {
+pub async fn line_to(exec_state: &mut ExecState, args: Args) -> Result<KclValue, KclError> {
     let (to, sketch_group, tag): ([f64; 2], SketchGroup, Option<TagDeclarator>) =
         args.get_data_and_sketch_group_and_tag()?;
 
     let new_sketch_group = inner_line_to(to, sketch_group, tag, args).await?;
+    exec_state.put_artifact(
+        ArtifactId::new(new_sketch_group.id),
+        KclValue::new_user_val(new_sketch_group.meta.clone(), new_sketch_group.clone()),
+    );
+
     Ok(KclValue::new_user_val(new_sketch_group.meta.clone(), new_sketch_group))
 }
 
@@ -1410,10 +1415,14 @@ pub(crate) fn inner_profile_start(sketch_group: SketchGroup) -> Result<[f64; 2],
 }
 
 /// Close the current sketch.
-pub async fn close(_exec_state: &mut ExecState, args: Args) -> Result<KclValue, KclError> {
+pub async fn close(exec_state: &mut ExecState, args: Args) -> Result<KclValue, KclError> {
     let (sketch_group, tag): (SketchGroup, Option<TagDeclarator>) = args.get_sketch_group_and_optional_tag()?;
 
     let new_sketch_group = inner_close(sketch_group, tag, args).await?;
+    exec_state.put_artifact(
+        ArtifactId::new(new_sketch_group.id),
+        KclValue::new_user_val(new_sketch_group.meta.clone(), new_sketch_group.clone()),
+    );
 
     Ok(KclValue::new_user_val(new_sketch_group.meta.clone(), new_sketch_group))
 }

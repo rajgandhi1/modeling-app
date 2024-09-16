@@ -15,17 +15,17 @@ use uuid::Uuid;
 use crate::{
     errors::{KclError, KclErrorDetails},
     executor::{
-        ExecState, ExtrudeGroup, ExtrudeGroupSet, ExtrudeSurface, GeoMeta, KclValue, Path, SketchGroup, SketchGroupSet,
-        SketchSurface,
+        ArtifactId, ExecState, ExtrudeGroup, ExtrudeGroupSet, ExtrudeSurface, GeoMeta, KclValue, Path, SketchGroup,
+        SketchGroupSet, SketchSurface,
     },
     std::Args,
 };
 
 /// Extrudes by a given amount.
-pub async fn extrude(_exec_state: &mut ExecState, args: Args) -> Result<KclValue, KclError> {
+pub async fn extrude(exec_state: &mut ExecState, args: Args) -> Result<KclValue, KclError> {
     let (length, sketch_group_set) = args.get_number_sketch_group_set()?;
 
-    let result = inner_extrude(length, sketch_group_set, args).await?;
+    let result = inner_extrude(length, sketch_group_set, exec_state, args).await?;
 
     Ok(result.into())
 }
@@ -79,7 +79,12 @@ pub async fn extrude(_exec_state: &mut ExecState, args: Args) -> Result<KclValue
 #[stdlib {
     name = "extrude"
 }]
-async fn inner_extrude(length: f64, sketch_group_set: SketchGroupSet, args: Args) -> Result<ExtrudeGroupSet, KclError> {
+async fn inner_extrude(
+    length: f64,
+    sketch_group_set: SketchGroupSet,
+    exec_state: &mut ExecState,
+    args: Args,
+) -> Result<ExtrudeGroupSet, KclError> {
     let id = uuid::Uuid::new_v4();
 
     // Extrude the element(s).
@@ -120,7 +125,7 @@ async fn inner_extrude(length: f64, sketch_group_set: SketchGroupSet, args: Args
             ModelingCmd::SketchModeDisable(mcmd::SketchModeDisable {}),
         )
         .await?;
-        extrude_groups.push(do_post_extrude(sketch_group.clone(), length, args.clone()).await?);
+        extrude_groups.push(do_post_extrude(sketch_group.clone(), length, exec_state, args.clone()).await?);
     }
 
     Ok(extrude_groups.into())
@@ -129,6 +134,7 @@ async fn inner_extrude(length: f64, sketch_group_set: SketchGroupSet, args: Args
 pub(crate) async fn do_post_extrude(
     sketch_group: SketchGroup,
     length: f64,
+    exec_state: &mut ExecState,
     args: Args,
 ) -> Result<Box<ExtrudeGroup>, KclError> {
     // Bring the object to the front of the scene.
@@ -276,7 +282,7 @@ pub(crate) async fn do_post_extrude(
         })
         .collect();
 
-    Ok(Box::new(ExtrudeGroup {
+    let extrude_group = Box::new(ExtrudeGroup {
         // Ok so you would think that the id would be the id of the extrude group,
         // that we passed in to the function, but it's actually the id of the
         // sketch group.
@@ -288,7 +294,13 @@ pub(crate) async fn do_post_extrude(
         start_cap_id,
         end_cap_id,
         edge_cuts: vec![],
-    }))
+    });
+    exec_state.put_artifact(
+        ArtifactId::new(extrude_group.id),
+        KclValue::ExtrudeGroup(extrude_group.clone()),
+    );
+
+    Ok(extrude_group)
 }
 
 #[derive(Default)]

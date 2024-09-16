@@ -4,6 +4,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Result;
 use async_recursion::async_recursion;
+use fnv::FnvHashMap;
 use kcmc::{
     each_cmd as mcmd,
     ok_response::{output::TakeSnapshot, OkModelingCmdResponse},
@@ -45,6 +46,16 @@ pub struct ExecState {
     /// The current value of the pipe operator returned from the previous
     /// expression.  If we're not currently in a pipeline, this will be None.
     pub pipe_value: Option<KclValue>,
+    /// Artifacts created by the program.  It's safe to use a faster hash
+    /// algorithm since all keys are UUIDs that we generate.
+    pub artifacts: FnvHashMap<ArtifactId, Artifact>,
+}
+
+impl ExecState {
+    /// Insert or update artifact by ID.
+    pub(crate) fn put_artifact(&mut self, id: ArtifactId, value: KclValue) {
+        self.artifacts.insert(id, Artifact { id, value });
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
@@ -394,6 +405,21 @@ impl From<Vec<Box<ExtrudeGroup>>> for KclValue {
             KclValue::ExtrudeGroups { value: eg }
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize, ts_rs::TS, JsonSchema)]
+pub struct ArtifactId(uuid::Uuid);
+
+impl ArtifactId {
+    pub(crate) fn new(id: uuid::Uuid) -> Self {
+        Self(id)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, ts_rs::TS, JsonSchema)]
+pub struct Artifact {
+    pub id: ArtifactId,
+    pub value: KclValue,
 }
 
 /// A geometry.

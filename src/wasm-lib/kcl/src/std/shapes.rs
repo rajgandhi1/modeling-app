@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     ast::types::TagDeclarator,
     errors::KclError,
-    executor::{BasePath, ExecState, GeoMeta, KclValue, Path, SketchGroup, SketchSurface},
+    executor::{ArtifactId, BasePath, ExecState, GeoMeta, KclValue, Path, SketchGroup, SketchSurface},
     std::Args,
 };
 
@@ -46,6 +46,11 @@ pub async fn circle(exec_state: &mut ExecState, args: Args) -> Result<KclValue, 
         args.get_circle_args()?;
 
     let sketch_group = inner_circle(data, sketch_surface_or_group, tag, exec_state, args).await?;
+    exec_state.put_artifact(
+        ArtifactId::new(sketch_group.id),
+        KclValue::new_user_val(sketch_group.meta.clone(), sketch_group.clone()),
+    );
+
     Ok(KclValue::new_user_val(sketch_group.meta.clone(), sketch_group))
 }
 
