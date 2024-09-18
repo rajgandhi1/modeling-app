@@ -37,6 +37,8 @@ import { Configuration } from 'wasm-lib/kcl/bindings/Configuration'
 import { DeepPartial } from 'lib/types'
 import { ProjectConfiguration } from 'wasm-lib/kcl/bindings/ProjectConfiguration'
 import { SketchGroup } from '../wasm-lib/kcl/bindings/SketchGroup'
+import { ArtifactId } from 'wasm-lib/kcl/bindings/ArtifactId'
+import { Artifact } from 'wasm-lib/kcl/bindings/Artifact'
 
 export type { Program } from '../wasm-lib/kcl/bindings/Program'
 export type { Expr } from '../wasm-lib/kcl/bindings/Expr'
@@ -135,6 +137,34 @@ export const parse = (code: string | Error): Program | Error => {
 }
 
 export type PathToNode = [string | number, string][]
+
+interface RawExecState {
+  memory: RawProgramMemory
+  artifacts: { [key: ArtifactId]: Artifact }
+}
+
+export interface ExecState {
+  memory: ProgramMemory
+  artifacts: { [key: ArtifactId]: Artifact }
+}
+
+/**
+ * Create an empty ExecState.  This is useful on init to prevent needing an
+ * Option.
+ */
+export function emptyExecState(): ExecState {
+  return {
+    memory: ProgramMemory.empty(),
+    artifacts: {},
+  }
+}
+
+function execStateFromRaw(raw: RawExecState): ExecState {
+  return {
+    memory: ProgramMemory.fromRaw(raw.memory),
+    artifacts: raw.artifacts,
+  }
+}
 
 interface Memory {
   [key: string]: KclValue
@@ -353,12 +383,49 @@ export function sketchGroupFromKclValue(
   }
 }
 
+export function optionalSketchGroupFromKclValue(
+  value: KclValue
+): SketchGroup | null {
+  if (value.type === 'UserVal' && value.value.type === 'SketchGroup')
+    return value.value
+  return null
+}
+
+export function kclValueFromArtifactId(
+  execState: ExecState,
+  id: ArtifactId
+): KclValue | null {
+  const artifact = execState.artifacts[id]
+  if (!artifact) {
+    console.warn('kclValueFromArtifactId id not found', id, execState)
+  }
+  if (!artifact) return null
+  return artifact.value
+}
+
+export function sketchGroupFromArtifactId(
+  execState: ExecState,
+  id: ArtifactId
+): SketchGroup | null {
+  const kclValue = kclValueFromArtifactId(execState, id)
+  if (!kclValue) {
+    console.warn('sketchGroupFromArtifactId id not found', id)
+    return null
+  }
+  const sketch = optionalSketchGroupFromKclValue(kclValue)
+  if (!sketch) {
+    console.warn('sketchGroupFromArtifactId not a SketchGroup', kclValue)
+    return null
+  }
+  return sketch
+}
+
 export const executor = async (
   node: Program,
   programMemory: ProgramMemory | Error = ProgramMemory.empty(),
   engineCommandManager: EngineCommandManager,
   isMock: boolean = false
-): Promise<ProgramMemory> => {
+): Promise<ExecState> => {
   if (err(programMemory)) return Promise.reject(programMemory)
 
   // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -380,7 +447,7 @@ export const _executor = async (
   programMemory: ProgramMemory | Error = ProgramMemory.empty(),
   engineCommandManager: EngineCommandManager,
   isMock: boolean
-): Promise<ProgramMemory> => {
+): Promise<ExecState> => {
   if (err(programMemory)) return Promise.reject(programMemory)
 
   try {
@@ -392,7 +459,7 @@ export const _executor = async (
       baseUnit =
         (await getSettingsState)()?.modeling.defaultUnit.current || 'mm'
     }
-    const memory: RawProgramMemory = await execute_wasm(
+    const execState: RawExecState = await execute_wasm(
       JSON.stringify(node),
       JSON.stringify(programMemory.toRaw()),
       baseUnit,
@@ -400,7 +467,7 @@ export const _executor = async (
       fileSystemManager,
       isMock
     )
-    return ProgramMemory.fromRaw(memory)
+    return execStateFromRaw(execState)
   } catch (e: any) {
     console.log(e)
     const parsed: RustKclError = JSON.parse(e.toString())

@@ -40,7 +40,7 @@ async function testingSwapSketchFnCall({
   const ast = parse(inputCode)
   if (err(ast)) return Promise.reject(ast)
 
-  const programMemory = await enginelessExecutor(ast)
+  const execState = await enginelessExecutor(ast)
   const selections = {
     codeBasedSelections: [range],
     otherSelections: [],
@@ -51,7 +51,7 @@ async function testingSwapSketchFnCall({
     return Promise.reject(new Error('transformInfos undefined'))
   const ast2 = transformAstSketchLines({
     ast,
-    programMemory,
+    programMemory: execState.memory,
     selectionRanges: selections,
     transformInfos,
     referenceSegName: '',
@@ -366,10 +366,10 @@ const part001 = startSketchOn('XY')
   |> line([2.14, 1.35], %) // normal-segment
   |> xLine(3.54, %)`
   it('normal case works', async () => {
-    const programMemory = await enginelessExecutor(parse(code))
+    const execState = await enginelessExecutor(parse(code))
     const index = code.indexOf('// normal-segment') - 7
     const sg = sketchGroupFromKclValue(
-      programMemory.get('part001'),
+      execState.memory.get('part001'),
       'part001'
     ) as SketchGroup
     const _segment = getSketchSegmentFromSourceRange(sg, [index, index])
@@ -383,11 +383,11 @@ const part001 = startSketchOn('XY')
     })
   })
   it('verify it works when the segment is in the `start` property', async () => {
-    const programMemory = await enginelessExecutor(parse(code))
+    const execState = await enginelessExecutor(parse(code))
     const index = code.indexOf('// segment-in-start') - 7
     const _segment = getSketchSegmentFromSourceRange(
       sketchGroupFromKclValue(
-        programMemory.get('part001'),
+        execState.memory.get('part001'),
         'part001'
       ) as SketchGroup,
       [index, index]

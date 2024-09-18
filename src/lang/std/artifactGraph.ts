@@ -849,3 +849,26 @@ export function getPlaneOrFaceFromSelection(
   }
   return null
 }
+
+/**
+ * Get the path from a selection.
+ */
+export function getPathFromSelection(
+  id: ArtifactId,
+  artifactGraph: ArtifactGraph
+): PathArtifact | null {
+  const selection = artifactGraph.get(id)
+  if (!selection) return null
+  if (selection.type === 'solid2D') {
+    const path = artifactGraph.get(selection.pathId)
+    if (path?.type !== 'path') return null
+    return path
+  } else if (selection.type === 'wall' || selection.type === 'cap') {
+    const sweep = artifactGraph.get(selection.sweepId)
+    if (sweep?.type !== 'sweep') return null
+    const path = artifactGraph.get(sweep.pathId)
+    if (path?.type !== 'path') return null
+    return path
+  }
+  return null
+}

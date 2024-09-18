@@ -44,6 +44,8 @@ import {
   VariableDeclaration,
   VariableDeclarator,
   sketchGroupFromKclValue,
+  ExecState,
+  sketchGroupFromArtifactId,
 } from 'lang/wasm'
 import {
   engineCommandManager,
@@ -97,6 +99,7 @@ import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer'
 import {
   ArtifactGraph,
   ArtifactId,
+  getPathFromSelection,
   getPlaneOrFaceFromSelection,
 } from 'lang/std/artifactGraph'
 import { SegmentInputs } from 'lang/std/stdTypes'
@@ -397,17 +400,37 @@ export class SceneEntities {
     const { truncatedAst, programMemoryOverride, variableDeclarationName } =
       prepared
 
-    const { programMemory } = await executeAst({
+    const { execState } = await executeAst({
       ast: truncatedAst,
       useFakeExecutor: true,
       engineCommandManager: this.engineCommandManager,
       programMemoryOverride,
     })
-    const sketchGroup = sketchGroupFromPathToNode({
-      pathToNode: sketchPathToNode,
-      ast: maybeModdedAst,
-      programMemory,
-    })
+    const programMemory = execState.memory
+    let sketchGroup: SketchGroup | null | Error = null
+    if (selectionRanges) {
+      console.warn('setupSketch looking for sketch from selection')
+      sketchGroup = sketchGroupFromSelection({
+        selections: selectionRanges,
+        execState: kclManager.execState,
+        // execState,
+        artifactGraph: this.engineCommandManager.artifactGraph,
+      })
+      if (sketchGroup) {
+        console.warn('setupSketch found sketch from selection')
+      }
+    }
+    if (!sketchGroup) {
+      console.warn(
+        'setupSketch sketch not found from selection; falling back to program memory'
+      )
+      // Fall back to the sketch group from the program memory.
+      sketchGroup = sketchGroupFromPathToNode({
+        pathToNode: sketchPathToNode,
+        ast: maybeModdedAst,
+        programMemory,
+      })
+    }
     if (err(sketchGroup)) return Promise.reject(sketchGroup)
     if (!sketchGroup) return Promise.reject('sketchGroup not found')
 
@@ -810,12 +833,13 @@ export class SceneEntities {
           updateRectangleSketch(sketchInit, x, y, tags[0])
         }
 
-        const { programMemory } = await executeAst({
+        const { execState } = await executeAst({
           ast: truncatedAst,
           useFakeExecutor: true,
           engineCommandManager: this.engineCommandManager,
           programMemoryOverride,
         })
+        const programMemory = execState.memory
         this.sceneProgramMemory = programMemory
         const sketchGroup = sketchGroupFromKclValue(
           programMemory.get(variableDeclarationName),
@@ -864,12 +888,13 @@ export class SceneEntities {
           await kclManager.executeAstMock(_ast)
           sceneInfra.modelingSend({ type: 'Finish rectangle' })
 
-          const { programMemory } = await executeAst({
+          const { execState } = await executeAst({
             ast: _ast,
             useFakeExecutor: true,
             engineCommandManager: this.engineCommandManager,
             programMemoryOverride,
           })
+          const programMemory = execState.memory
 
           // Prepare to update the THREEjs scene
           this.sceneProgramMemory = programMemory
@@ -988,12 +1013,13 @@ export class SceneEntities {
           modded = moddedResult.modifiedAst
         }
 
-        const { programMemory } = await executeAst({
+        const { execState } = await executeAst({
           ast: modded,
           useFakeExecutor: true,
           engineCommandManager: this.engineCommandManager,
           programMemoryOverride,
         })
+        const programMemory = execState.memory
         this.sceneProgramMemory = programMemory
         const sketchGroup = sketchGroupFromKclValue(
           programMemory.get(variableDeclarationName),
@@ -1347,12 +1373,13 @@ export class SceneEntities {
         // don't want to mod the user's code yet as they have't committed to the change yet
         // plus this would be the truncated ast being recast, it would be wrong
         codeManager.updateCodeEditor(code)
-      const { programMemory } = await executeAst({
+      const { execState } = await executeAst({
         ast: truncatedAst,
         useFakeExecutor: true,
         engineCommandManager: this.engineCommandManager,
         programMemoryOverride,
       })
+      const programMemory = execState.memory
       this.sceneProgramMemory = programMemory
 
       const maybeSketchGroup = programMemory.get(variableDeclarationName)
@@ -1855,6 +1882,43 @@ export async function planeOrFaceFromSelection({
   return null
 }
 
+export function sketchGroupFromSelection({
+  selections,
+  artifactGraph,
+  execState,
+}: {
+  selections: Selections
+  artifactGraph: ArtifactGraph
+  execState: ExecState
+}): SketchGroup | null {
+  if (selections.codeBasedSelections.length !== 1) {
+    // Give up if there isn't exactly one selection.
+    console.warn(
+      'sketchGroupFromSelection no single selection',
+      selections.codeBasedSelections.length,
+      selections
+    )
+    return null
+  }
+  const selection = selections.codeBasedSelections[0]
+  const artifactId = selection.artifactId
+  if (!artifactId) {
+    console.warn(
+      'sketchGroupFromSelection artifact ID not found',
+      selections.codeBasedSelections.length,
+      selections
+    )
+  }
+  if (!artifactId) return null
+  const path = getPathFromSelection(artifactId, artifactGraph)
+  if (!path) {
+    console.warn('sketchGroupFromSelection path not found', artifactId)
+    return null
+  }
+  const sketch = sketchGroupFromArtifactId(execState, path.id)
+  return sketch
+}
+
 export function sketchGroupFromPathToNode({
   pathToNode,
   ast,
@@ -1949,6 +2013,9 @@ export async function getSketchOrientationDetails(
 
   // We couldn't find the plane or face, so try to look at the AST, and find it
   // through there.
+  console.warn(
+    'getSketchOrientationDetails falling back to sketchGroupFromPathToNode'
+  )
   const sketchGroup = sketchGroupFromPathToNode({
     pathToNode: sketchPathToNode,
     ast: kclManager.ast,
