@@ -94,7 +94,6 @@ import {
 import { getThemeColorForThreeJs, Themes } from 'lib/theme'
 import { err, reportRejection, trap } from 'lib/trap'
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer'
-import { Point3d } from 'wasm-lib/kcl/bindings/Point3d'
 import {
   ArtifactGraph,
   ArtifactId,
@@ -130,8 +129,6 @@ export const SEGMENT_BODIES_PLUS_PROFILE_START = [
   ...SEGMENT_BODIES,
   PROFILE_START,
 ]
-
-type Vec3Array = [number, number, number]
 
 // This singleton Class is responsible for all of the things the user sees and interacts with.
 // That mostly mean sketch elements.
@@ -1906,21 +1903,6 @@ function colorSegment(object: any, color: number) {
   }
 }
 
-export function getSketchQuaternion(
-  sketchPathToNode: PathToNode,
-  sketchNormalBackUp: [number, number, number] | null
-): Quaternion | Error {
-  const sketchGroup = sketchGroupFromPathToNode({
-    pathToNode: sketchPathToNode,
-    ast: kclManager.ast,
-    programMemory: kclManager.programMemory,
-  })
-  if (err(sketchGroup)) return sketchGroup
-  const zAxis = sketchGroup?.on.zAxis || sketchNormalBackUp
-  if (!zAxis) return Error('SketchGroup zAxis not found')
-
-  return getQuaternionFromZAxis(massageFormats(zAxis))
-}
 export async function getSketchOrientationDetails(
   artifactGraph: ArtifactGraph,
   selection: Selection,
@@ -2072,8 +2054,4 @@ export function getQuaternionFromZAxis(zAxis: Vector3): Quaternion {
     quaternion.set(0, 0, 0, 1)
   }
   return quaternion
-}
-
-function massageFormats(a: Vec3Array | Point3d): Vector3 {
-  return isArray(a) ? new Vector3(a[0], a[1], a[2]) : new Vector3(a.x, a.y, a.z)
 }
