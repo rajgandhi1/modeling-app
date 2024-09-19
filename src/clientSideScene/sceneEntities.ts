@@ -1928,6 +1928,7 @@ export function sketchGroupFromPathToNode({
   ast: Program
   programMemory: ProgramMemory
 }): SketchGroup | null | Error {
+  console.warn('**** sketchGroupFromPathToNode **** Deprecated')
   const _varDec = getNodeFromPath<VariableDeclarator>(
     kclManager.ast,
     pathToNode,
