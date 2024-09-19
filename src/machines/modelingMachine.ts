@@ -1,5 +1,8 @@
 import {
+  Expr,
+  ExpressionStatement,
   PathToNode,
+  PipeExpression,
   VariableDeclaration,
   VariableDeclarator,
   parse,
@@ -2116,15 +2119,24 @@ export function isEditingExistingSketch({
   // should check that the variable declaration is a pipeExpression
   // and that the pipeExpression contains a "startProfileAt" callExpression
   if (!sketchDetails?.sketchPathToNode) return false
-  const variableDeclaration = getNodeFromPath<VariableDeclarator>(
+  const _node1 = getNodeFromPath<VariableDeclaration | ExpressionStatement>(
     kclManager.ast,
     sketchDetails.sketchPathToNode,
-    'VariableDeclarator'
-  )
-  if (err(variableDeclaration)) return false
-  if (variableDeclaration.node.type !== 'VariableDeclarator') return false
-  const pipeExpression = variableDeclaration.node.init
-  if (pipeExpression.type !== 'PipeExpression') return false
+    ['VariableDeclaration', 'ExpressionStatement']
+  ) as { node: { type: string } } | Error
+  if (err(_node1)) return false
+  let expr: Expr
+  if (_node1.node.type === 'VariableDeclaration') {
+    const varDecl = _node1.node as VariableDeclaration
+    expr = varDecl.declarations[0].init
+  } else if (_node1.node.type === 'ExpressionStatement') {
+    const exprStatement = _node1.node as ExpressionStatement
+    expr = exprStatement.expression
+  } else {
+    return false
+  }
+  if (expr.type !== 'PipeExpression') return false
+  const pipeExpression: PipeExpression = expr
   const hasStartProfileAt = pipeExpression.body.some(
     (item) =>
       item.type === 'CallExpression' && item.callee.name === 'startProfileAt'
