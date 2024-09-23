@@ -1,0 +1,51 @@
+const sketch001 = startSketchOn('XZ')
+  |> startProfileAt([23.53, 152.5], %)
+  |> angledLine([0, 172.25], %, $rectangleSegmentA001)
+  |> angledLine([
+       segAng(rectangleSegmentA001) - 90,
+       110.07
+     ], %, $rectangleSegmentB001)
+  |> angledLine([
+       segAng(rectangleSegmentA001),
+       -segLen(rectangleSegmentA001)
+     ], %, $rectangleSegmentC001)
+  |> lineTo([profileStartX(%), profileStartY(%)], %)
+  |> close(%)
+const extrude001 = extrude(100, sketch001)
+const sketch004 = startSketchOn(extrude001, 'END')
+  |> startProfileAt([81.71, 89.86], %)
+  |> line([26.96, 39.72], %)
+  |> line([37.27, -41.68], %, $seg03)
+  |> lineTo([profileStartX(%), profileStartY(%)], %, $seg04)
+  |> close(%)
+const extrude003 = extrude(100, sketch004)
+  |> chamfer({
+       length: 22,
+       tags: [getNextAdjacentEdge(seg04), getOppositeEdge(seg03)]
+     }, %)
+const sketch002 = startSketchOn('XZ')
+  |> startProfileAt([272.24, 46.63], %)
+  |> angledLine([0, 150.77], %, $rectangleSegmentA002)
+  |> angledLine([
+       segAng(rectangleSegmentA002) + 90,
+       215.94
+     ], %, $rectangleSegmentB002)
+  |> angledLine([
+       segAng(rectangleSegmentA002),
+       -segLen(rectangleSegmentA002)
+     ], %, $rectangleSegmentC002)
+  |> lineTo([profileStartX(%), profileStartY(%)], %)
+  |> close(%)
+const extrude002 = extrude(160, sketch002)
+const sketch003 = startSketchOn(extrude002, rectangleSegmentC002)
+  |> startProfileAt([-340.96, 50.64], %)
+  |> line([29.12, 77.97], %, $seg02)
+  |> line([19.74, -70.08], %, $seg01)
+  |> lineTo([profileStartX(%), profileStartY(%)], %)
+  |> close(%)
+const extrude004 = extrude(100, sketch003)
+  |> chamfer({
+       length: 18,
+       tags: [getNextAdjacentEdge(seg01), seg02]
+     }, %)
+

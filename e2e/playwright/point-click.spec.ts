@@ -270,4 +270,43 @@ test.describe('verify sketch on chamfer works', () => {
       )
     })
   })
+  test('works on chamfers on sketchOnFace extrudes', async ({ app, page }) => {
+    test.skip(
+      process.platform === 'win32',
+      'Fails on windows in CI, can not be replicated locally on windows.'
+    )
+    const file = await app.getInputFile(
+      'e2e-can-sketch-on-sketchOnFace-chamfers.kcl'
+    )
+    await app.initialise(file)
+
+    const sketchOnAChamfer = _sketchOnAChamfer(app)
+
+    // clickCoords: { x: 627, y: 287 },
+    await sketchOnAChamfer({
+      clickCoords: { x: 858, y: 194 },
+      cameraPos: { x: 8822, y: 1223, z: 9140 },
+      cameraTarget: { x: 10856, y: -7390, z: 2832 },
+      beforeChamferSnippet: `chamfer({
+       length: 18,
+       tags: [getNextAdjacentEdge(seg01), seg02]
+     }, %)`,
+      afterChamferSelectSnippet:
+        'const sketch005 = startSketchOn(extrude004, seg05)',
+      afterRectangle1stClickSnippet: 'startProfileAt([-23.43, 19.69], %)',
+      afterRectangle2ndClickSnippet: `angledLine([0, 9.1], %, $rectangleSegmentA005)
+    |> angledLine([
+         segAng(rectangleSegmentA005) - 90,
+         84.07
+       ], %, $rectangleSegmentB004)
+    |> angledLine([
+         segAng(rectangleSegmentA005),
+         -segLen(rectangleSegmentA005)
+       ], %, $rectangleSegmentC004)
+    |> lineTo([profileStartX(%), profileStartY(%)], %)
+    |> close(%)`,
+    })
+
+    await page.waitForTimeout(100)
+  })
 })
