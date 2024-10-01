@@ -306,9 +306,19 @@ export class CameraControls {
         event: 'camera_drag_end',
         callback: cb,
       })
+      this.engineCommandManager.subscribeToUnreliable({
+        event: 'default_camera_zoom',
+        callback: (a) => {
+          console.log('zoom', a)
+          cb(a)
+        },
+      })
       this.engineCommandManager.subscribeTo({
         event: 'default_camera_zoom',
-        callback: cb,
+        callback: (a) => {
+          console.log('zoom', a)
+          cb(a)
+        },
       })
       this.engineCommandManager.subscribeTo({
         event: 'default_camera_get_settings',

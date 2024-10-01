@@ -1230,7 +1230,7 @@ type ModelTypes = Models['OkModelingCmdResponse_type']['type']
 
 type UnreliableResponses = Extract<
   Models['OkModelingCmdResponse_type'],
-  { type: 'highlight_set_entity' | 'camera_drag_move' }
+  { type: 'highlight_set_entity' | 'camera_drag_move' | 'default_camera_zoom' }
 >
 export interface UnreliableSubscription<T extends UnreliableResponses['type']> {
   event: T
@@ -1572,9 +1572,11 @@ export class EngineCommandManager extends EventTarget {
             'message',
             (event: MessageEvent) => {
               const result: UnreliableResponses = JSON.parse(event.data)
+              console.log('result', result)
               Object.values(
                 this.unreliableSubscriptions[result.type] || {}
               ).forEach(
+                
                 // TODO: There is only one response that uses the unreliable channel atm,
                 // highlight_set_entity, if there are more it's likely they will all have the same
                 // sequence logic, but I'm not sure if we use a single global sequence or a sequence
@@ -1933,6 +1935,9 @@ export class EngineCommandManager extends EventTarget {
     ) {
       ;(cmd as any).sequence = this.outSequence
       this.outSequence++
+      if(cmd.type === 'default_camera_zoom') {
+        console.log('sending zoom', cmd)
+      }
       this.engineConnection?.unreliableSend(command)
       return Promise.resolve(null)
     } else if (
