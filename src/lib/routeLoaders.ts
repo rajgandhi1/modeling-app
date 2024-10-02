@@ -185,7 +185,6 @@ export const homeLoader: LoaderFunction = async (): Promise<
     return redirect(PATHS.FILE + '/%2F' + BROWSER_PROJECT_NAME)
   }
   const { configuration } = await loadAndValidateSettings()
-
   const projectDir = await ensureProjectDirectoryExists(configuration)
 
   if (projectDir) {
@@ -193,10 +192,12 @@ export const homeLoader: LoaderFunction = async (): Promise<
 
     return {
       projects,
+      projectDir,
     }
   } else {
     return {
       projects: [],
+      projectDir: undefined,
     }
   }
 }

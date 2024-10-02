@@ -38,11 +38,12 @@ import {
 } from 'lib/desktop'
 import { ProjectSearchBar, useProjectSearch } from 'components/ProjectSearchBar'
 import { Project } from 'lib/project'
+import { useFileSystemWatcher } from 'hooks/useFileSystemWatcher'
 
 // This route only opens in the desktop context for now,
 // as defined in Router.tsx, so we can use the desktop APIs and types.
 const Home = () => {
-  const { projects: loadedProjects } = useLoaderData() as HomeLoaderData
+  const { projects: loadedProjects, projectDir } = useLoaderData() as HomeLoaderData
   useRefreshSettings(PATHS.HOME + 'SETTINGS')
   const { commandBarSend } = useCommandsContext()
   const navigate = useNavigate()
@@ -50,6 +51,9 @@ const Home = () => {
     settings: { context: settings },
   } = useSettingsAuthContext()
   const { onProjectOpen } = useLspContext()
+
+  // Reload home / projects listing if the projectDir has any updates.
+  useFileSystemWatcher(() => { navigate(0) }, projectDir ? [projectDir] : [])
 
   // Cancel all KCL executions while on the home page
   useEffect(() => {

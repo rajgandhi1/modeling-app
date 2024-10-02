@@ -14,6 +14,7 @@ export type FileLoaderData = {
 
 export type HomeLoaderData = {
   projects: Project[]
+  projectDir?: string
 }
 
 // From the very helpful @jcalz on StackOverflow: https://stackoverflow.com/a/58436959/22753272

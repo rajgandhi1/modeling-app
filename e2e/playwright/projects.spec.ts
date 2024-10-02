@@ -18,6 +18,43 @@ test.afterEach(async ({ page }, testInfo) => {
 })
 
 test(
+  'projects reload if a new one is created, deleted, or renamed externally',
+  { tag: '@electron' },
+  async ({ browserName }, testInfo) => {
+    const externalCreatedProjectName = 'external-created-project'
+
+    let targetDir = ''
+
+    const { electronApp, page } = await setupElectron({
+      testInfo,
+      folderSetupFn: async (dir) => {
+        targetDir = dir
+        setTimeout(async () => {
+          const myDir = join(dir, externalCreatedProjectName)
+          await fsp.mkdir(myDir)
+        }, 1000)
+      },
+    })
+
+    await page.setViewportSize({ width: 1200, height: 500 })
+
+    const projectLinks = page.getByTestId('project-link')
+
+    await projectLinks.first().waitFor()
+    await expect(projectLinks).toHaveText(externalCreatedProjectName)
+
+    await fsp.rename(join(targetDir, externalCreatedProjectName), join(targetDir, externalCreatedProjectName + '1'))
+    await expect(projectLinks).toHaveText(externalCreatedProjectName + '1')
+
+    await fsp.rm(join(targetDir, externalCreatedProjectName), { recursive: true, force: true })
+    const projectsTotal = await projectLinks.count()
+    await expect(projectsTotal).toBe(0)
+
+    await electronApp.close()
+  }
+)
+
+test(
   'click help/keybindings from home page',
   { tag: '@electron' },
   async ({ browserName }, testInfo) => {
