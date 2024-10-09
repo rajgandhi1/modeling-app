@@ -21,7 +21,7 @@ use crate::{
     },
     std::{
         utils::{
-            arc_angles, arc_center_and_end, get_tangent_point_from_previous_arc, get_tangential_arc_to_info,
+            arc_angles, arc_start_center_and_end, get_tangent_point_from_previous_arc, get_tangential_arc_to_info,
             get_x_component, get_y_component, intersection_with_parallel_line, TangentialArcInfoInput,
         },
         Args,
@@ -1485,6 +1485,17 @@ pub async fn arc(_exec_state: &mut ExecState, args: Args) -> Result<KclValue, Kc
     Ok(KclValue::new_user_val(new_sketch.meta.clone(), new_sketch))
 }
 
+/// Squared distance between two points
+fn distance_squared(a: Point2d, b: Point2d) -> f64 {
+    let v = Point2d { 
+        x: b.x - a.x,
+        y: b.y - a.y, 
+    };
+    let dot = v.x * v.x + v.y * v.y;
+
+    dot
+}
+
 /// Draw a curved line segment along an imaginary circle.
 /// The arc is constructed such that the current position of the sketch is
 /// placed along an imaginary circle of the specified radius, at angleStart
@@ -1524,9 +1535,31 @@ pub(crate) async fn inner_arc(
             angle_end,
             radius,
         } => {
-            let a_start = Angle::from_degrees(*angle_start);
-            let a_end = Angle::from_degrees(*angle_end);
-            let (center, end) = arc_center_and_end(from, a_start, a_end, *radius);
+            let mut a_start = Angle::from_degrees(*angle_start);
+            let mut a_end = Angle::from_degrees(*angle_end);
+
+            //duplicating engine logic to make sure this is _exactly_ what engine is doing - mike
+            // if a_start.to_degrees() > a_end.to_degrees() {
+            //     // this implies a clockwise arc, so swap the angles to a matching counter-clockwise arc
+            //     std::mem::swap(&mut a_start, &mut a_end);
+            // }
+
+            let (mut start, center, mut end) = arc_start_center_and_end(from, a_start, a_end, *radius);
+            let desired_start = from;            
+            let dist1 = distance_squared(start, desired_start);
+            let dist2 = distance_squared(end, desired_start);
+
+            #[cfg(target_arch = "wasm32")]
+            {
+                web_sys::console::log_1(&format!("testing {dist1} vs {dist2}!").into());
+            }
+
+            if !(dist2 < dist1) { //flipped from engine ????????????
+                #[cfg(target_arch = "wasm32")]
+                web_sys::console::log_1(&format!("swapping!").into());
+                std::mem::swap(&mut start, &mut end);
+            }        
+
             (center, a_start, a_end, *radius, end)
         }
         ArcData::CenterToRadius { center, to, radius } => {
@@ -1671,7 +1704,7 @@ async fn inner_tangential_arc(
             // but the above logic *should* capture that behavior
             let start_angle = previous_end_tangent + tangent_to_arc_start_angle;
             let end_angle = start_angle + offset;
-            let (center, to) = arc_center_and_end(from, start_angle, end_angle, radius);
+            let (_, center, to) = arc_start_center_and_end(from, start_angle, end_angle, radius);
 
             args.batch_modeling_cmd(
                 id,

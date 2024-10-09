@@ -204,13 +204,61 @@ pub fn get_x_component(angle: Angle, y: f64) -> Point2d {
     Point2d { x, y }.scale(sign)
 }
 
-pub fn arc_center_and_end(from: Point2d, start_angle: Angle, end_angle: Angle, radius: f64) -> (Point2d, Point2d) {
+fn arc_center_and_end(from: Point2d, start_angle: Angle, end_angle: Angle, radius: f64) -> (Point2d, Point2d) {
+    let (_, center, end) = arc_start_center_and_end(from, start_angle, end_angle, radius);
+    (center, end)
+}
+
+pub fn arc_start_center_and_end(from: Point2d, start_angle: Angle, end_angle: Angle, radius: f64) -> (Point2d, Point2d, Point2d) {
     let start_angle = start_angle.to_radians();
     let end_angle = end_angle.to_radians();
+
+    let eval = |t: f64, radius: f64, center: Point2d| { //UNUSED (this didn't work either for some reason.. - mike)
+        //HACK - using this as an example to demonstrate that even something as simple as an arc can be problematic to 
+        //duplicate this type of logic on the frontend side because of all the little edge cases 
+        //we must come up with a better strategy to avoid this sort of stuff in the future.
+        //having to manually port this sort of code directly into rust is error-prone, and 
+        //really isn't a good usage of dev time - mike    
+        let sin_of_pi = if ((4.0*PI).sin()).abs() > PI.sin().abs() {
+            4.0*PI.sin().abs()
+        } else {
+            PI.sin().abs()
+        };
+
+        let cos_of_pi_over_2 = if (4.5*PI).cos().abs() > (0.5*PI).sin().abs() {
+            (4.5*PI).cos().abs()
+        } else {
+            (0.5*PI).sin().abs()
+        };
+        
+        let mut c = t.cos();
+        let mut s = t.sin();
+
+        if c.abs() <= cos_of_pi_over_2 {
+            c = 0.0;
+            s = if s < 0.0 { -1.0 } else { 1.0 };
+        } else if s.abs() <= sin_of_pi {
+            s = 0.0;
+            c = if c < 0.0 { -1.0 } else { 1.0 };
+        }
+
+        Point2d {
+            x: center.x + radius * c,
+            y: center.y + radius * s,
+        }
+    };
 
     let center = Point2d {
         x: -1.0 * (radius * start_angle.cos() - from.x),
         y: -1.0 * (radius * start_angle.sin() - from.y),
+    };
+
+    //let start = eval(start_angle, radius, center);
+    //let end = eval(end_angle, radius, center);
+
+    let start = Point2d {
+        x: center.x + radius * start_angle.cos(),
+        y: center.y + radius * start_angle.sin(),
     };
 
     let end = Point2d {
@@ -218,7 +266,14 @@ pub fn arc_center_and_end(from: Point2d, start_angle: Angle, end_angle: Angle, r
         y: center.y + radius * end_angle.sin(),
     };
 
-    (center, end)
+    #[cfg(target_arch = "wasm32")]
+    {
+        let start_deg = start_angle.to_degrees();
+        let end_deg = end_angle.to_degrees();
+        web_sys::console::log_1(&format!("Arc testing {start_deg:?}, {end_deg:?} -> center: {center:?}, start: {start:?} end: {end:?}").into());
+    }
+
+    (start, center, end)
 }
 
 pub fn arc_angles(
