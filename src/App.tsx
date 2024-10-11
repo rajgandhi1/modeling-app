@@ -3,7 +3,7 @@ import { useHotKeyListener } from './hooks/useHotKeyListener'
 import { Stream } from './components/Stream'
 import { AppHeader } from './components/AppHeader'
 import { useHotkeys } from 'react-hotkeys-hook'
-import { useLoaderData, useNavigate } from 'react-router-dom'
+import { useLoaderData, useLocation, useNavigate } from 'react-router-dom'
 import { type IndexLoaderData } from 'lib/types'
 import { PATHS } from 'lib/paths'
 import { useSettingsAuthContext } from 'hooks/useSettingsAuthContext'
@@ -22,16 +22,24 @@ import Gizmo from 'components/Gizmo'
 import { CoreDumpManager } from 'lib/coredump'
 import { UnitsMenu } from 'components/UnitsMenu'
 import { CameraProjectionToggle } from 'components/CameraProjectionToggle'
+import { homeDefaultStatusBarItems } from 'components/statusBar/homeDefaultStatusBarItems'
+import { StatusBar } from 'components/StatusBar'
+import { useModelStateStatus } from 'components/ModelStateIndicator'
+import { useNetworkHealthStatus } from 'components/NetworkHealthIndicator'
+import { useModelingContext } from 'hooks/useModelingContext'
+import { xStateValueToString } from 'lib/xStateValueToString'
 
 export function App() {
   const { project, file } = useLoaderData() as IndexLoaderData
   useRefreshSettings(PATHS.FILE + 'SETTINGS')
   const navigate = useNavigate()
+  const location = useLocation()
   const filePath = useAbsoluteFilePath()
   const { onProjectOpen } = useLspContext()
   // We need the ref for the outermost div so we can screenshot the app for
   // the coredump.
   const ref = useRef<HTMLDivElement>(null)
+  const { state: modelingState } = useModelingContext()
 
   const projectName = project?.name || null
   const projectPath = project?.path || null
@@ -73,21 +81,43 @@ export function App() {
   useEngineConnectionSubscriptions()
 
   return (
-    <div className="relative h-full flex flex-col" ref={ref}>
-      <AppHeader
-        className={'transition-opacity transition-duration-75 ' + paneOpacity}
-        project={{ project, file }}
-        enableMenu={true}
+    <div className="h-screen w-full flex flex-col">
+      <div className="relative flex flex-1 flex-col" ref={ref}>
+        <AppHeader
+          className={'transition-opacity transition-duration-75 ' + paneOpacity}
+          project={{ project, file }}
+          enableMenu={true}
+        />
+        <ModalContainer />
+        <ModelingSidebar paneOpacity={paneOpacity} />
+        <Stream />
+        {/* <CamToggle /> */}
+        <LowerRightControls coreDumpManager={coreDumpManager}>
+          <UnitsMenu />
+          <Gizmo />
+          <CameraProjectionToggle />
+        </LowerRightControls>
+      </div>
+      <StatusBar
+        globalItems={[
+          useNetworkHealthStatus(),
+          ...homeDefaultStatusBarItems({ coreDumpManager, location }),
+        ]}
+        localItems={[
+          {
+            id: 'modeling-state',
+            element: 'text',
+            label:
+              modelingState.value instanceof Object
+                ? xStateValueToString(modelingState.value) ?? ''
+                : modelingState.value,
+            toolTip: {
+              children: 'The current state of the modeler',
+            },
+          },
+          useModelStateStatus(),
+        ]}
       />
-      <ModalContainer />
-      <ModelingSidebar paneOpacity={paneOpacity} />
-      <Stream />
-      {/* <CamToggle /> */}
-      <LowerRightControls coreDumpManager={coreDumpManager}>
-        <UnitsMenu />
-        <Gizmo />
-        <CameraProjectionToggle />
-      </LowerRightControls>
     </div>
   )
 }

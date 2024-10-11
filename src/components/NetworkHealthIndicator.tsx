@@ -6,6 +6,7 @@ import { useNetworkContext } from '../hooks/useNetworkContext'
 import { NetworkHealthState } from '../hooks/useNetworkStatus'
 import { toSync } from 'lib/utils'
 import { reportRejection } from 'lib/trap'
+import { StatusBarItemType } from './statusBar/statusBarTypes'
 
 export const NETWORK_HEALTH_TEXT: Record<NetworkHealthState, string> = {
   [NetworkHealthState.Ok]: 'Connected',
@@ -64,14 +65,28 @@ const overallConnectionStateColor: Record<NetworkHealthState, IconColorConfig> =
     },
   }
 
-const overallConnectionStateIcon: Record<
-  NetworkHealthState,
-  ActionIconProps['icon']
-> = {
+const overallConnectionStateIcon = {
   [NetworkHealthState.Ok]: 'network',
   [NetworkHealthState.Weak]: 'network',
   [NetworkHealthState.Issue]: 'networkCrossedOut',
   [NetworkHealthState.Disconnected]: 'networkCrossedOut',
+} as const
+
+export const useNetworkHealthStatus = (): StatusBarItemType => {
+  const { overallState } = useNetworkContext()
+
+  return {
+    id: 'network-health',
+    label: `Network health (${NETWORK_HEALTH_TEXT[overallState]})`,
+    hideLabel: true,
+    element: 'button',
+    className: overallConnectionStateColor[overallState].icon,
+    onClick: () => {},
+    toolTip: {
+      children: 'View the health of your network connections',
+    },
+    icon: overallConnectionStateIcon[overallState],
+  }
 }
 
 export const NetworkHealthIndicator = () => {

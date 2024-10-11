@@ -1085,7 +1085,10 @@ export const ModelingMachineProvider = ({
     >
       {/* TODO #818: maybe pass reff down to children/app.ts or render app.tsx directly?
       since realistically it won't ever have generic children that isn't app.tsx */}
-      <div className="h-screen overflow-hidden select-none" ref={streamRef}>
+      <div
+        className="flex flex-col h-screen overflow-hidden select-none"
+        ref={streamRef}
+      >
         {children}
       </div>
     </ModelingMachineContext.Provider>

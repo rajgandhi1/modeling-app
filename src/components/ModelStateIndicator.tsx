@@ -1,6 +1,39 @@
 import { useEngineCommands } from './EngineCommands'
 import { Spinner } from './Spinner'
 import { CustomIcon } from './CustomIcon'
+import { StatusBarItemType } from './statusBar/statusBarTypes'
+
+export const useModelStateStatus = (): StatusBarItemType => {
+  const [commands] = useEngineCommands()
+  const lastCommandType = commands[commands.length - 1]?.type
+
+  let icon: StatusBarItemType['icon'] = 'loading'
+  const baseDataTestId = 'model-state-indicator'
+  let dataTestId = baseDataTestId
+
+  if (lastCommandType === 'receive-reliable') {
+    icon = 'checkmark'
+    dataTestId = `${baseDataTestId}-receive-reliable`
+  } else if (lastCommandType === 'execution-done') {
+    icon = 'checkmark'
+    dataTestId = `${baseDataTestId}-execution-done`
+  } else if (lastCommandType === 'export-done') {
+    icon = 'checkmark'
+    dataTestId = `${baseDataTestId}-export-done`
+  }
+
+  return {
+    id: 'model-state-indicator',
+    label: '',
+    icon,
+    toolTip: {
+      children: 'Model state indicator',
+    },
+    element: 'button',
+    onClick: () => {},
+    'data-testid': dataTestId,
+  }
+}
 
 export const ModelStateIndicator = () => {
   const [commands] = useEngineCommands()
