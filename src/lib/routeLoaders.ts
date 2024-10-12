@@ -109,7 +109,7 @@ export const fileLoader: LoaderFunction = async (
         )
       }
 
-      code = await window.electron.readFile(currentFilePath)
+      code = await window.electron.readFile(currentFilePath, 'utf-8')
       code = normalizeLineEndings(code)
 
       // Update both the state and the editor's code.

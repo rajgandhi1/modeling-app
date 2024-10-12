@@ -28,8 +28,9 @@ class FileSystemManager {
       )
     }
 
-    return this.join(this.dir, path).then((filePath) => {
-      return window.electron.readFile(filePath)
+    return this.join(this.dir, path).then(async (filePath) => {
+      const content = await window.electron.readFile(filePath)
+      return content
     })
   }
 
