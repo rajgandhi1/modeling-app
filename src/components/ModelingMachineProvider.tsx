@@ -90,6 +90,7 @@ type MachineContext<T extends AnyStateMachine> = {
   state: StateFrom<T>
   context: ContextFrom<T>
   send: Prop<Actor<T>, 'send'>
+  streamRef: React.RefObject<HTMLDivElement>
 }
 
 export const ModelingMachineContext = createContext(
@@ -1090,16 +1091,10 @@ export const ModelingMachineProvider = ({
         state: modelingState,
         context: modelingState.context,
         send: modelingSend,
+        streamRef,
       }}
     >
-      {/* TODO #818: maybe pass reff down to children/app.ts or render app.tsx directly?
-      since realistically it won't ever have generic children that isn't app.tsx */}
-      <div
-        className="flex flex-col h-screen overflow-hidden select-none"
-        ref={streamRef}
-      >
-        {children}
-      </div>
+      {children}
     </ModelingMachineContext.Provider>
   )
 }

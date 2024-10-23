@@ -36,10 +36,7 @@ export function App() {
   const location = useLocation()
   const filePath = useAbsoluteFilePath()
   const { onProjectOpen } = useLspContext()
-  // We need the ref for the outermost div so we can screenshot the app for
-  // the coredump.
-  const ref = useRef<HTMLDivElement>(null)
-  const { state: modelingState } = useModelingContext()
+  const { state: modelingState, streamRef } = useModelingContext()
 
   const projectName = project?.name || null
   const projectPath = project?.path || null
@@ -81,8 +78,8 @@ export function App() {
   useEngineConnectionSubscriptions()
 
   return (
-    <div className="h-screen w-full flex flex-col">
-      <div className="relative flex flex-1 flex-col" ref={ref}>
+    <div className="h-screen flex flex-col overflow-hidden select-none">
+      <div className="relative flex flex-1 flex-col" ref={streamRef}>
         <AppHeader
           className={'transition-opacity transition-duration-75 ' + paneOpacity}
           project={{ project, file }}
