@@ -15,6 +15,10 @@ export type StatusBarItemType = {
       onClick: (event: React.MouseEvent<HTMLButtonElement>) => void
     }
   | {
+    element: 'popover'
+    popoverContent: React.ReactNode
+  }
+  | {
       element: 'link' | 'externalLink'
       href: string
     }

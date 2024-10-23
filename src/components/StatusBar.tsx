@@ -3,6 +3,7 @@ import { ActionButton } from './ActionButton'
 import { StatusBarItemType } from './statusBar/statusBarTypes'
 import Tooltip, { TooltipProps } from './Tooltip'
 import { ActionIcon } from './ActionIcon'
+import { Popover } from '@headlessui/react'
 
 export function StatusBar({
   globalItems,
@@ -23,17 +24,13 @@ export function StatusBar({
       className="relative z-10 flex justify-between items-center bg-chalkboard-20 dark:bg-chalkboard-90 text-chalkboard-80 dark:text-chalkboard-30 border-t border-t-chalkboard-30 dark:border-t-chalkboard-80"
     >
       <menu id="statusbar-globals" className="flex items-stretch">
-        {globalItems.map((item, index) => (
-          <StatusBarItem key={item.id} {...item} position={'left'} />
+        {globalItems.map((item) => (
+          <StatusBarItem key={item.id} {...item} position="left" />
         ))}
       </menu>
       <menu id="statusbar-locals" className="flex items-stretch">
-        {localItems.map((item, index) => (
-          <StatusBarItem
-            key={item.id}
-            {...item}
-            position={index === localItems.length - 1 ? 'right' : 'middle'}
-          />
+        {localItems.map((item) => (
+          <StatusBarItem key={item.id} {...item} position="right" />
         ))}
       </menu>
     </footer>
@@ -71,6 +68,40 @@ function StatusBarItem(
             <Tooltip {...props.toolTip} position={tooltipPosition} />
           )}
         </ActionButton>
+      )
+    case 'popover':
+      return (
+        <Popover className="relative">
+          <Popover.Button
+            as={ActionButton}
+            Element="button"
+            iconStart={
+              props.icon && {
+                icon: props.icon,
+                iconClassName: props.icon === 'loading' ? 'animate-spin' : '',
+                bgClassName: 'bg-transparent dark:bg-transparent',
+              }
+            }
+            className={defaultClassNames + ' ' + props.className}
+            data-testid={props['data-testid']}
+          >
+            {props.label && (
+              <span className={props.hideLabel ? 'sr-only' : ''}>
+                {props.label}
+              </span>
+            )}
+            {props.toolTip && (
+              <Tooltip
+                {...props.toolTip}
+                wrapperClassName={`${
+                  props.toolTip?.wrapperClassName || ''
+                } ui-open:hidden`}
+                position={tooltipPosition}
+              />
+            )}
+          </Popover.Button>
+          <Popover.Panel>{props.popoverContent}</Popover.Panel>
+        </Popover>
       )
     case 'text':
       return (
