@@ -1,16 +1,4 @@
-import { NODE_ENV } from 'env'
-import { isTestEnv } from './isTestEnv'
-import { isDesktop } from './isDesktop'
-
 export const APP_NAME = 'Modeling App'
-/** Version number of the app */
-export const APP_VERSION =
-  isTestEnv && NODE_ENV === 'development'
-    ? '11.22.33'
-    : isDesktop()
-    ? // @ts-ignore
-      window.electron.packageJson.version
-    : 'main'
 /** Search string in new project names to increment as an index */
 export const INDEX_IDENTIFIER = '$n'
 /** The maximum number of 0's to pad a default project name's index with */

@@ -4,7 +4,7 @@ import { reportRejection } from 'lib/trap'
 import { CoreDumpManager } from 'lib/coredump'
 import toast from 'react-hot-toast'
 import { coreDump } from 'lang/wasm'
-import { APP_VERSION } from 'lib/constants'
+import { APP_VERSION } from 'lib/appVersion'
 import { Location } from 'react-router-dom'
 import { PATHS } from 'lib/paths'
 
@@ -27,6 +27,7 @@ export const homeDefaultStatusBarItems = ({
   {
     id: 'report-bug',
     element: 'button',
+    icon: 'bug',
     label: 'Report a bug',
     onClick: (event) => reportBug(event, { coreDumpManager }),
     toolTip: {
@@ -43,7 +44,6 @@ export const homeDefaultStatusBarItems = ({
       (location.pathname.includes(PATHS.FILE) ? '?tab=project' : ''),
     'data-testid': 'settings-link',
     label: 'Settings',
-    hideLabel: true,
     toolTip: {
       children: 'Settings',
     },
