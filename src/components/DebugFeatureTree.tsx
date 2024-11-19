@@ -2,6 +2,8 @@ import { useMemo } from 'react'
 import { engineCommandManager } from 'lib/singletons'
 import {
   ArtifactGraph,
+  DefaultPlaneArtifactRich,
+  expandDefaultPlane,
   expandPlane,
   PlaneArtifactRich,
 } from 'lang/std/artifactGraph'
@@ -30,9 +32,11 @@ export function DebugFeatureTree() {
 function computeTree(artifactGraph: ArtifactGraph): GenericObj[] {
   let items: GenericObj[] = []
 
-  const planes: PlaneArtifactRich[] = []
+  const planes: (PlaneArtifactRich | DefaultPlaneArtifactRich)[] = []
   for (const artifact of artifactGraph.values()) {
-    if (artifact.type === 'plane') {
+    if (artifact.type === 'defaultPlane') {
+      planes.push(expandDefaultPlane(artifact, artifactGraph))
+    } else if (artifact.type === 'plane') {
       planes.push(expandPlane(artifact, artifactGraph))
     }
   }

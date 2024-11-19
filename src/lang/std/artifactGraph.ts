@@ -2,12 +2,28 @@ import { PathToNode, Program, SourceRange } from 'lang/wasm'
 import { Models } from '@kittycad/lib'
 import { getNodePathFromSourceRange } from 'lang/queryAst'
 import { err } from 'lib/trap'
+import { DefaultPlaneStr } from 'clientSideScene/sceneEntities'
+import { DefaultPlanes } from 'wasm-lib/kcl/bindings/DefaultPlanes'
+import { defaultPlaneKeyToKcl, isDefaultPlaneKey } from 'lib/planes'
 
 export type ArtifactId = string
 
 interface CommonCommandProperties {
   range: SourceRange
   pathToNode: PathToNode
+}
+
+export interface DefaultPlaneArtifact {
+  type: 'defaultPlane'
+  pathIds: Array<ArtifactId>
+  /** The default plane's KCL keyword, e.g. `'XY'` or `'-YZ'` */
+  planeName: DefaultPlaneStr
+}
+export interface DefaultPlaneArtifactRich {
+  type: 'defaultPlane'
+  paths: Array<PathArtifact>
+  /** The default plane's KCL keyword, e.g. `'XY'` or `'-YZ'` */
+  planeName: DefaultPlaneStr
 }
 
 export interface PlaneArtifact {
@@ -119,6 +135,7 @@ interface EdgeCutEdge {
 }
 
 export type Artifact =
+  | DefaultPlaneArtifact
   | PlaneArtifact
   | PathArtifact
   | SegmentArtifact
@@ -149,10 +166,12 @@ export interface OrderedCommand {
  * should return data on how to update the map, and not do so directly.
  */
 export function createArtifactGraph({
+  defaultPlanes,
   orderedCommands,
   responseMap,
   ast,
 }: {
+  defaultPlanes?: DefaultPlanes | null
   orderedCommands: Array<OrderedCommand>
   responseMap: ResponseMap
   ast: Program
@@ -161,6 +180,18 @@ export function createArtifactGraph({
 
   /** see docstring for {@link getArtifactsToUpdate} as to why this is needed */
   let currentPlaneId = ''
+
+  // First, populate the map with the default planes
+  if (defaultPlanes && defaultPlanes !== null) {
+    Object.entries(defaultPlanes).forEach(([name, id]) => {
+      if (!isDefaultPlaneKey(name, defaultPlanes)) return
+      myMap.set(id, {
+        type: 'defaultPlane',
+        pathIds: [],
+        planeName: defaultPlaneKeyToKcl(name),
+      })
+    })
+  }
 
   orderedCommands.forEach((orderedCommand) => {
     if (orderedCommand.command?.type === 'modeling_cmd_req') {
@@ -264,7 +295,10 @@ export function getArtifactsToUpdate({
     ]
   } else if (cmd.type === 'enable_sketch_mode') {
     const plane = getArtifact(currentPlaneId)
-    const pathIds = plane?.type === 'plane' ? plane?.pathIds : []
+    const pathIds =
+      plane?.type === 'plane' || plane?.type === 'defaultPlane'
+        ? plane?.pathIds
+        : []
     const codeRef =
       plane?.type === 'plane' ? plane?.codeRef : { range, pathToNode }
     const existingPlane = getArtifact(currentPlaneId)
@@ -278,6 +312,17 @@ export function getArtifactsToUpdate({
             edgeCutEdgeIds: existingPlane.edgeCutEdgeIds,
             sweepId: existingPlane.sweepId,
             pathIds: existingPlane.pathIds,
+          },
+        },
+      ]
+    } else if (existingPlane?.type === 'defaultPlane') {
+      return [
+        {
+          id: currentPlaneId,
+          artifact: {
+            type: 'defaultPlane',
+            pathIds,
+            planeName: existingPlane.planeName,
           },
         },
       ]
@@ -315,6 +360,16 @@ export function getArtifactsToUpdate({
           edgeCutEdgeIds: plane.edgeCutEdgeIds,
           sweepId: plane.sweepId,
           pathIds: [id],
+        },
+      })
+    }
+    if (plane?.type === 'defaultPlane') {
+      returnArr.push({
+        id: currentPlaneId,
+        artifact: {
+          type: 'defaultPlane',
+          pathIds: [id],
+          planeName: plane.planeName,
         },
       })
     }
@@ -578,6 +633,21 @@ export function getArtifactOfTypes<T extends Artifact['type'][]>(
   if (!types.includes(artifact?.type))
     return new Error(`Expected ${types} but got ${artifact?.type}`)
   return artifact as Extract<Artifact, { type: T[number] }>
+}
+
+export function expandDefaultPlane(
+  plane: DefaultPlaneArtifact,
+  artifactGraph: ArtifactGraph
+): DefaultPlaneArtifactRich {
+  const paths = getArtifactsOfTypes(
+    { keys: plane.pathIds, types: ['path'] },
+    artifactGraph
+  )
+  return {
+    type: 'defaultPlane',
+    paths: Array.from(paths.values()),
+    planeName: plane.planeName,
+  }
 }
 
 export function expandPlane(

@@ -2128,6 +2128,7 @@ export class EngineCommandManager extends EventTarget {
   async waitForAllCommands() {
     await Promise.all(Object.values(this.pendingCommands).map((a) => a.promise))
     this.artifactGraph = createArtifactGraph({
+      defaultPlanes: this.defaultPlanes,
       orderedCommands: this.orderedCommands,
       responseMap: this.responseMap,
       ast: this.getAst(),
