@@ -67,6 +67,8 @@ pub enum TokenType {
     Unknown,
     /// The ? symbol, used for optional values.
     QuestionMark,
+    /// The @ symbol.
+    At,
 }
 
 /// Most KCL tokens correspond to LSP semantic tokens (but not all).
@@ -93,6 +95,7 @@ impl TryFrom<TokenType> for SemanticTokenType {
             | TokenType::DoublePeriod
             | TokenType::Hash
             | TokenType::Dollar
+            | TokenType::At
             | TokenType::Unknown => {
                 anyhow::bail!("unsupported token type: {:?}", token_type)
             }
