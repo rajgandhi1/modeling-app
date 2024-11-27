@@ -13,7 +13,7 @@ import { isDesktop } from 'lib/isDesktop'
 import { ActionButton } from 'components/ActionButton'
 import { SettingsFieldInput } from './SettingsFieldInput'
 import toast from 'react-hot-toast'
-import { APP_VERSION, PACKAGE_NAME } from 'lib/appVersion'
+import { APP_VERSION } from 'lib/appVersion'
 import { PATHS } from 'lib/paths'
 import {
   createAndOpenNewTutorialProject,
@@ -25,6 +25,7 @@ import { useLspContext } from 'components/LspProvider'
 import { toSync } from 'lib/utils'
 import { reportRejection } from 'lib/trap'
 import { openExternalBrowserIfDesktop } from 'lib/openWindow'
+import { PACKAGE_NAME } from 'routes/Settings'
 
 interface AllSettingsFieldsProps {
   searchParamTab: SettingsLevel

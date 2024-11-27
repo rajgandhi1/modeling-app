@@ -29,6 +29,7 @@ import { useNetworkHealthStatus } from 'components/NetworkHealthIndicator'
 import { useModelingContext } from 'hooks/useModelingContext'
 import { xStateValueToString } from 'lib/xStateValueToString'
 import { maybeWriteToDisk } from 'lib/telemetry'
+import { useNetworkMachineStatus } from 'components/NetworkMachineIndicator'
 maybeWriteToDisk()
   .then(() => {})
   .catch(() => {})
@@ -102,6 +103,7 @@ export function App() {
       <StatusBar
         globalItems={[
           useNetworkHealthStatus(),
+          useNetworkMachineStatus(),
           ...homeDefaultStatusBarItems({ coreDumpManager, location }),
         ]}
         localItems={[

@@ -12,12 +12,6 @@ export function StatusBar({
   globalItems: StatusBarItemType[]
   localItems: StatusBarItemType[]
 }) {
-  useEffect(() => {
-    console.log('items', {
-      globalItems,
-      localItems,
-    })
-  }, [])
   return (
     <footer
       id="statusbar"

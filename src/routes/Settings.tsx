@@ -12,6 +12,7 @@ import { SettingsSectionsList } from 'components/Settings/SettingsSectionsList'
 import { AllSettingsFields } from 'components/Settings/AllSettingsFields'
 import { AllKeybindingsFields } from 'components/Settings/AllKeybindingsFields'
 import { KeybindingsSectionsList } from 'components/Settings/KeybindingsSectionsList'
+import { isDesktop } from 'lib/isDesktop'
 
 export const PACKAGE_NAME = isDesktop()
   ? window.electron.packageJson.name
