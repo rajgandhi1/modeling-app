@@ -21,9 +21,12 @@ import {
 import { getNodeFromPath } from './queryAst'
 import { codeManager, editorManager, sceneInfra } from 'lib/singletons'
 import { Diagnostic } from '@codemirror/lint'
+import { markOnce } from 'lib/performance'
+import { Node } from 'wasm-lib/kcl/bindings/Node'
+import { EntityType_type } from '@kittycad/lib/dist/types/src/models'
 
 interface ExecuteArgs {
-  ast?: Program
+  ast?: Node<Program>
   zoomToFit?: boolean
   executionId?: number
   zoomOnRangeAndType?: {
@@ -33,13 +36,15 @@ interface ExecuteArgs {
 }
 
 export class KclManager {
-  private _ast: Program = {
+  private _ast: Node<Program> = {
     body: [],
+    shebang: null,
     start: 0,
     end: 0,
+    moduleId: 0,
     nonCodeMeta: {
       nonCodeNodes: {},
-      start: [],
+      startNodes: [],
     },
   }
   private _execState: ExecState = emptyExecState()
@@ -55,7 +60,7 @@ export class KclManager {
   engineCommandManager: EngineCommandManager
 
   private _isExecutingCallback: (arg: boolean) => void = () => {}
-  private _astCallBack: (arg: Program) => void = () => {}
+  private _astCallBack: (arg: Node<Program>) => void = () => {}
   private _programMemoryCallBack: (arg: ProgramMemory) => void = () => {}
   private _logsCallBack: (arg: string[]) => void = () => {}
   private _kclErrorsCallBack: (arg: KCLError[]) => void = () => {}
@@ -122,7 +127,7 @@ export class KclManager {
     if (this.lints.length > 0) {
       diagnostics = diagnostics.concat(this.lints)
     }
-    editorManager.setDiagnostics(diagnostics)
+    editorManager?.setDiagnostics(diagnostics)
   }
 
   addKclErrors(kclErrors: KCLError[]) {
@@ -181,7 +186,7 @@ export class KclManager {
     setWasmInitFailed,
   }: {
     setProgramMemory: (arg: ProgramMemory) => void
-    setAst: (arg: Program) => void
+    setAst: (arg: Node<Program>) => void
     setLogs: (arg: string[]) => void
     setKclErrors: (arg: KCLError[]) => void
     setIsExecuting: (arg: boolean) => void
@@ -201,16 +206,18 @@ export class KclManager {
   clearAst() {
     this._ast = {
       body: [],
+      shebang: null,
       start: 0,
       end: 0,
+      moduleId: 0,
       nonCodeMeta: {
         nonCodeNodes: {},
-        start: [],
+        startNodes: [],
       },
     }
   }
 
-  safeParse(code: string): Program | null {
+  safeParse(code: string): Node<Program> | null {
     const ast = parse(code)
     this.lints = []
     this.kclErrors = []
@@ -254,6 +261,7 @@ export class KclManager {
     }
 
     const ast = args.ast || this.ast
+    markOnce('code/startExecuteAst')
 
     const currentExecutionId = args.executionId || Date.now()
     this._cancelTokens.set(currentExecutionId, false)
@@ -274,7 +282,7 @@ export class KclManager {
       this.lints = await lintAst({ ast: ast })
 
       sceneInfra.modelingSend({ type: 'code edit during sketch' })
-      defaultSelectionFilter(execState.memory, this.engineCommandManager)
+      setSelectionFilterToDefault(execState.memory, this.engineCommandManager)
 
       if (args.zoomToFit) {
         let zoomObjectId: string | undefined = ''
@@ -328,6 +336,7 @@ export class KclManager {
     })
 
     this._cancelTokens.delete(currentExecutionId)
+    markOnce('code/endExecuteAst')
   }
   // NOTE: this always updates the code state and editor.
   // DO NOT CALL THIS from codemirror ever.
@@ -351,9 +360,6 @@ export class KclManager {
       this.clearAst()
       return
     }
-    codeManager.updateCodeEditor(newCode)
-    // Write the file to disk.
-    await codeManager.writeToFile()
     this._ast = { ...newAst }
 
     const { logs, errors, execState } = await executeAst({
@@ -377,7 +383,7 @@ export class KclManager {
     Array.from(this.engineCommandManager.artifactGraph).forEach(
       ([commandId, artifact]) => {
         if (!('codeRef' in artifact)) return
-        const _node1 = getNodeFromPath<CallExpression>(
+        const _node1 = getNodeFromPath<Node<CallExpression>>(
           this.ast,
           artifact.codeRef.pathToNode,
           'CallExpression'
@@ -428,20 +434,16 @@ export class KclManager {
 
     // Update the code state and the editor.
     codeManager.updateCodeStateEditor(code)
-    // Write back to the file system.
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    codeManager.writeToFile()
 
-    // execute the code.
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    this.executeCode()
+    // Write back to the file system.
+    void codeManager.writeToFile().then(() => this.executeCode())
   }
   // There's overlapping responsibility between updateAst and executeAst.
   // updateAst was added as it was used a lot before xState migration so makes the port easier.
   // but should probably have think about which of the function to keep
   // This always updates the code state and editor and writes to the file system.
   async updateAst(
-    ast: Program,
+    ast: Node<Program>,
     execute: boolean,
     optionalParams?: {
       focusPath?: Array<PathToNode>
@@ -452,7 +454,7 @@ export class KclManager {
       }
     }
   ): Promise<{
-    newAst: Program
+    newAst: Node<Program>
     selections?: Selections
   }> {
     const newCode = recast(ast)
@@ -464,7 +466,7 @@ export class KclManager {
 
     if (optionalParams?.focusPath) {
       returnVal = {
-        codeBasedSelections: [],
+        graphSelections: [],
         otherSelections: [],
       }
 
@@ -486,20 +488,17 @@ export class KclManager {
           }
 
         if (start && end) {
-          returnVal.codeBasedSelections.push({
-            type: 'default',
-            range: [start, end],
+          returnVal.graphSelections.push({
+            codeRef: {
+              range: [start, end],
+              pathToNode: path,
+            },
           })
         }
       }
     }
 
     if (execute) {
-      // Call execute on the set ast.
-      // Update the code state and editor.
-      codeManager.updateCodeEditor(newCode)
-      // Write the file to disk.
-      await codeManager.writeToFile()
       await this.executeAst({
         ast: astWithUpdatedSource,
         zoomToFit: optionalParams?.zoomToFit,
@@ -570,8 +569,13 @@ export class KclManager {
     }
     return Promise.all(thePromises)
   }
+  /** TODO: this function is hiding unawaited asynchronous work */
   defaultSelectionFilter() {
-    defaultSelectionFilter(this.programMemory, this.engineCommandManager)
+    setSelectionFilterToDefault(this.programMemory, this.engineCommandManager)
+  }
+  /** TODO: this function is hiding unawaited asynchronous work */
+  setSelectionFilter(filter: EntityType_type[]) {
+    setSelectionFilter(filter, this.engineCommandManager)
   }
 
   /**
@@ -588,23 +592,40 @@ export class KclManager {
   }
 
   // Determines if there is no KCL code which means it is executing a blank KCL file
-  _isAstEmpty(ast: Program) {
+  _isAstEmpty(ast: Node<Program>) {
     return ast.start === 0 && ast.end === 0 && ast.body.length === 0
   }
 }
 
-function defaultSelectionFilter(
+const defaultSelectionFilter: EntityType_type[] = [
+  'face',
+  'edge',
+  'solid2d',
+  'curve',
+  'object',
+]
+
+/** TODO: This function is not synchronous but is currently treated as such */
+function setSelectionFilterToDefault(
   programMemory: ProgramMemory,
   engineCommandManager: EngineCommandManager
 ) {
   // eslint-disable-next-line @typescript-eslint/no-floating-promises
-  programMemory.hasSketchOrSolid() &&
-    engineCommandManager.sendSceneCommand({
-      type: 'modeling_cmd_req',
-      cmd_id: uuidv4(),
-      cmd: {
-        type: 'set_selection_filter',
-        filter: ['face', 'edge', 'solid2d', 'curve'],
-      },
-    })
+  setSelectionFilter(defaultSelectionFilter, engineCommandManager)
+}
+
+/** TODO: This function is not synchronous but is currently treated as such */
+function setSelectionFilter(
+  filter: EntityType_type[],
+  engineCommandManager: EngineCommandManager
+) {
+  // eslint-disable-next-line @typescript-eslint/no-floating-promises
+  engineCommandManager.sendSceneCommand({
+    type: 'modeling_cmd_req',
+    cmd_id: uuidv4(),
+    cmd: {
+      type: 'set_selection_filter',
+      filter,
+    },
+  })
 }

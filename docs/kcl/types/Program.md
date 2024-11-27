@@ -16,10 +16,11 @@ A KCL program top level, or function body.
 
 | Property | Type | Description | Required |
 |----------|------|-------------|----------|
-| `start` |[`EnvironmentRef`](/docs/kcl/types/EnvironmentRef)|  | No |
-| `end` |[`EnvironmentRef`](/docs/kcl/types/EnvironmentRef)|  | No |
 | `body` |`[` [`BodyItem`](/docs/kcl/types/BodyItem) `]`|  | No |
 | `nonCodeMeta` |[`NonCodeMeta`](/docs/kcl/types/NonCodeMeta)| A KCL program top level, or function body. | No |
+| `shebang` |[`Shebang`](/docs/kcl/types/Shebang)|  | No |
 | `digest` |`[, `integer`, `integer`, `integer`, `integer`, `integer`, `integer`, `integer`, `integer`, `integer`, `integer`, `integer`, `integer`, `integer`, `integer`, `integer`, `integer`, `integer`, `integer`, `integer`, `integer`, `integer`, `integer`, `integer`, `integer`, `integer`, `integer`, `integer`, `integer`, `integer`, `integer`, `integer`, `integer`]`|  | No |
+| `start` |`integer`|  | No |
+| `end` |`integer`|  | No |
 
 

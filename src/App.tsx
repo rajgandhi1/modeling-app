@@ -28,6 +28,10 @@ import { useModelStateStatus } from 'components/ModelStateIndicator'
 import { useNetworkHealthStatus } from 'components/NetworkHealthIndicator'
 import { useModelingContext } from 'hooks/useModelingContext'
 import { xStateValueToString } from 'lib/xStateValueToString'
+import { maybeWriteToDisk } from 'lib/telemetry'
+maybeWriteToDisk()
+  .then(() => {})
+  .catch(() => {})
 
 export function App() {
   const { project, file } = useLoaderData() as IndexLoaderData

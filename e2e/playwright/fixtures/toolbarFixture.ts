@@ -6,7 +6,9 @@ export class ToolbarFixture {
   public page: Page
 
   extrudeButton!: Locator
+  offsetPlaneButton!: Locator
   startSketchBtn!: Locator
+  lineBtn!: Locator
   rectangleBtn!: Locator
   exitSketchBtn!: Locator
   editSketchBtn!: Locator
@@ -15,6 +17,7 @@ export class ToolbarFixture {
   fileCreateToast!: Locator
   filePane!: Locator
   exeIndicator!: Locator
+  treeInputField!: Locator
 
   constructor(page: Page) {
     this.page = page
@@ -23,12 +26,15 @@ export class ToolbarFixture {
   reConstruct = (page: Page) => {
     this.page = page
     this.extrudeButton = page.getByTestId('extrude')
+    this.offsetPlaneButton = page.getByTestId('plane-offset')
     this.startSketchBtn = page.getByTestId('sketch')
+    this.lineBtn = page.getByTestId('line')
     this.rectangleBtn = page.getByTestId('corner-rectangle')
     this.exitSketchBtn = page.getByTestId('sketch-exit')
     this.editSketchBtn = page.getByText('Edit Sketch')
     this.fileTreeBtn = page.locator('[id="files-button-holder"]')
     this.createFileBtn = page.getByTestId('create-file-button')
+    this.treeInputField = page.getByTestId('tree-input-field')
 
     this.filePane = page.locator('#files-pane')
     this.fileCreateToast = page.getByText('Successfully created')
@@ -57,10 +63,15 @@ export class ToolbarFixture {
   expectFileTreeState = async (expected: string[]) => {
     await expect.poll(this._serialiseFileTree).toEqual(expected)
   }
-  createFile = async ({ wait }: { wait: boolean } = { wait: false }) => {
+  createFile = async (args: {
+    fileName: string
+    waitForToastToDisappear: boolean
+  }) => {
     await this.createFileBtn.click()
+    await this.treeInputField.fill(args.fileName)
+    await this.treeInputField.press('Enter')
     await expect(this.fileCreateToast).toBeVisible()
-    if (wait) {
+    if (args.waitForToastToDisappear) {
       await this.fileCreateToast.waitFor({ state: 'detached' })
     }
   }

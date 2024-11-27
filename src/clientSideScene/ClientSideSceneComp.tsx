@@ -44,6 +44,7 @@ import {
 import { ActionButton } from 'components/ActionButton'
 import { err, reportRejection, trap } from 'lib/trap'
 import { useCommandsContext } from 'hooks/useCommandsContext'
+import { Node } from 'wasm-lib/kcl/bindings/Node'
 
 function useShouldHideScene(): { hideClient: boolean; hideServer: boolean } {
   const [isCamMoving, setIsCamMoving] = useState(false)
@@ -201,12 +202,20 @@ const Overlay = ({
   let xAlignment = overlay.angle < 0 ? '0%' : '-100%'
   let yAlignment = overlay.angle < -90 || overlay.angle >= 90 ? '0%' : '-100%'
 
-  const _node1 = getNodeFromPath<CallExpression>(
+  // It's possible for the pathToNode to request a newer AST node
+  // than what's available in the AST at the moment of query.
+  // It eventually settles on being updated.
+  const _node1 = getNodeFromPath<Node<CallExpression>>(
     kclManager.ast,
     overlay.pathToNode,
     'CallExpression'
   )
-  if (err(_node1)) return
+
+  // For that reason, to prevent console noise, we do not use err here.
+  if (_node1 instanceof Error) {
+    console.warn('ast older than pathToNode, not fatal, eventually settles', '')
+    return
+  }
   const callExpression = _node1.node
 
   const constraints = getConstraintInfo(
@@ -381,7 +390,7 @@ export async function deleteSegment({
   pathToNode: PathToNode
   sketchDetails: SketchDetails | null
 }) {
-  let modifiedAst: Program | Error = kclManager.ast
+  let modifiedAst: Node<Program> | Error = kclManager.ast
   const dependentRanges = findUsesOfTagInPipe(modifiedAst, pathToNode)
 
   const shouldContinueSegDelete = dependentRanges.length
@@ -636,10 +645,16 @@ const ConstraintSymbol = ({
                 kclManager.ast,
                 kclManager.programMemory
               )
+
               if (!transform) return
               const { modifiedAst } = transform
-              // eslint-disable-next-line @typescript-eslint/no-floating-promises
-              kclManager.updateAst(modifiedAst, true)
+
+              await kclManager.updateAst(modifiedAst, true)
+
+              // Code editor will be updated in the modelingMachine.
+              const newCode = recast(modifiedAst)
+              if (err(newCode)) return
+              await codeManager.updateCodeEditor(newCode)
             } catch (e) {
               console.log('error', e)
             }

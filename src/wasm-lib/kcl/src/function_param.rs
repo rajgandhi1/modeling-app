@@ -6,6 +6,7 @@ use crate::{
     executor::{
         call_user_defined_function, ExecState, ExecutorContext, KclValue, MemoryFunction, Metadata, ProgramMemory,
     },
+    std::args::Arg,
 };
 
 /// A function being used as a parameter into a stdlib function.  This is a
@@ -13,13 +14,13 @@ use crate::{
 pub struct FunctionParam<'a> {
     pub inner: Option<&'a MemoryFunction>,
     pub memory: ProgramMemory,
-    pub fn_expr: Box<FunctionExpression>,
+    pub fn_expr: crate::ast::types::BoxNode<FunctionExpression>,
     pub meta: Vec<Metadata>,
     pub ctx: ExecutorContext,
 }
 
 impl<'a> FunctionParam<'a> {
-    pub async fn call(&self, exec_state: &mut ExecState, args: Vec<KclValue>) -> Result<Option<KclValue>, KclError> {
+    pub async fn call(&self, exec_state: &mut ExecState, args: Vec<Arg>) -> Result<Option<KclValue>, KclError> {
         if let Some(inner) = self.inner {
             inner(
                 args,

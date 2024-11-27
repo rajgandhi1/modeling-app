@@ -1,4 +1,5 @@
 //! Functions for the `kcl` lsp server.
+#![allow(dead_code)]
 
 use std::{
     collections::HashMap,
@@ -40,11 +41,11 @@ use tower_lsp::{
 };
 
 use crate::{
-    ast::types::{Expr, VariableKind},
-    executor::{IdGenerator, SourceRange},
+    ast::types::{Expr, ModuleId, Node, VariableKind},
     lsp::{backend::Backend as _, util::IntoDiagnostic},
     parser::PIPE_OPERATOR,
     token::TokenType,
+    ExecState, Program, SourceRange,
 };
 
 lazy_static::lazy_static! {
@@ -99,7 +100,7 @@ pub struct Backend {
     /// Token maps.
     pub token_map: DashMap<String, Vec<crate::token::Token>>,
     /// AST maps.
-    pub ast_map: DashMap<String, crate::ast::types::Program>,
+    pub ast_map: DashMap<String, Node<crate::ast::types::Program>>,
     /// Memory maps.
     pub memory_map: DashMap<String, crate::executor::ProgramMemory>,
     /// Current code.
@@ -120,6 +121,73 @@ pub struct Backend {
     pub can_execute: Arc<RwLock<bool>>,
 
     pub is_initialized: Arc<RwLock<bool>>,
+}
+
+impl Backend {
+    #[cfg(target_arch = "wasm32")]
+    pub fn new_wasm(
+        client: Client,
+        executor_ctx: Option<crate::executor::ExecutorContext>,
+        fs: crate::fs::wasm::FileSystemManager,
+        zoo_client: kittycad::Client,
+        can_send_telemetry: bool,
+    ) -> Result<Self, String> {
+        Self::with_file_manager(
+            client,
+            executor_ctx,
+            crate::fs::FileManager::new(fs),
+            zoo_client,
+            can_send_telemetry,
+        )
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn new(
+        client: Client,
+        executor_ctx: Option<crate::executor::ExecutorContext>,
+        zoo_client: kittycad::Client,
+        can_send_telemetry: bool,
+    ) -> Result<Self, String> {
+        Self::with_file_manager(
+            client,
+            executor_ctx,
+            crate::fs::FileManager::new(),
+            zoo_client,
+            can_send_telemetry,
+        )
+    }
+
+    fn with_file_manager(
+        client: Client,
+        executor_ctx: Option<crate::executor::ExecutorContext>,
+        fs: crate::fs::FileManager,
+        zoo_client: kittycad::Client,
+        can_send_telemetry: bool,
+    ) -> Result<Self, String> {
+        let stdlib = crate::std::StdLib::new();
+        let stdlib_completions = get_completions_from_stdlib(&stdlib).map_err(|e| e.to_string())?;
+        let stdlib_signatures = get_signatures_from_stdlib(&stdlib).map_err(|e| e.to_string())?;
+
+        Ok(Self {
+            client,
+            fs: Arc::new(fs),
+            stdlib_completions,
+            stdlib_signatures,
+            zoo_client,
+            can_send_telemetry,
+            can_execute: Arc::new(RwLock::new(executor_ctx.is_some())),
+            executor_ctx: Arc::new(RwLock::new(executor_ctx)),
+            workspace_folders: Default::default(),
+            token_map: Default::default(),
+            ast_map: Default::default(),
+            memory_map: Default::default(),
+            code_map: Default::default(),
+            diagnostics_map: Default::default(),
+            symbols_map: Default::default(),
+            semantic_tokens_map: Default::default(),
+            is_initialized: Default::default(),
+        })
+    }
 }
 
 // Implement the shared backend trait for the language server.
@@ -188,7 +256,8 @@ impl crate::lsp::backend::Backend for Backend {
         // We already updated the code map in the shared backend.
 
         // Lets update the tokens.
-        let tokens = match crate::token::lexer(&params.text) {
+        let module_id = ModuleId::default();
+        let tokens = match crate::token::lexer(&params.text, module_id) {
             Ok(tokens) => tokens,
             Err(err) => {
                 self.add_to_diagnostics(&params, &[err], true).await;
@@ -229,9 +298,9 @@ impl crate::lsp::backend::Backend for Backend {
         }
 
         // Lets update the ast.
-        let parser = crate::parser::Parser::new(tokens.clone());
-        let result = parser.ast();
-        let mut ast = match result {
+        let result = crate::parser::parse_tokens(tokens.clone());
+        // TODO handle parse errors properly
+        let mut ast = match result.parse_errs_as_err() {
             Ok(ast) => ast,
             Err(err) => {
                 self.add_to_diagnostics(&params, &[err], true).await;
@@ -288,7 +357,7 @@ impl crate::lsp::backend::Backend for Backend {
         // Execute the code if we have an executor context.
         // This function automatically executes if we should & updates the diagnostics if we got
         // errors.
-        if self.execute(&params, &ast).await.is_err() {
+        if self.execute(&params, &ast.into()).await.is_err() {
             return;
         }
 
@@ -571,7 +640,7 @@ impl Backend {
         self.client.publish_diagnostics(params.uri.clone(), items, None).await;
     }
 
-    async fn execute(&self, params: &TextDocumentItem, ast: &crate::ast::types::Program) -> Result<()> {
+    async fn execute(&self, params: &TextDocumentItem, ast: &Program) -> Result<()> {
         // Check if we can execute.
         if !self.can_execute().await {
             return Ok(());
@@ -588,25 +657,22 @@ impl Backend {
             return Ok(());
         }
 
-        let mut id_generator = IdGenerator::default();
+        let mut exec_state = ExecState::default();
 
         // Clear the scene, before we execute so it's not fugly as shit.
         executor_ctx
             .engine
-            .clear_scene(&mut id_generator, SourceRange::default())
+            .clear_scene(&mut exec_state.id_generator, SourceRange::default())
             .await?;
 
-        let exec_state = match executor_ctx.run(ast, None, id_generator, None).await {
-            Ok(exec_state) => exec_state,
-            Err(err) => {
-                self.memory_map.remove(params.uri.as_str());
-                self.add_to_diagnostics(params, &[err], false).await;
+        if let Err(err) = executor_ctx.run(ast, &mut exec_state).await {
+            self.memory_map.remove(params.uri.as_str());
+            self.add_to_diagnostics(params, &[err], false).await;
 
-                // Since we already published the diagnostics we don't really care about the error
-                // string.
-                return Err(anyhow::anyhow!("failed to execute code"));
-            }
-        };
+            // Since we already published the diagnostics we don't really care about the error
+            // string.
+            return Err(anyhow::anyhow!("failed to execute code"));
+        }
 
         self.memory_map
             .insert(params.uri.to_string(), exec_state.memory.clone());
@@ -1041,6 +1107,38 @@ impl LanguageServer for Backend {
             tags: None,
         }];
 
+        // Get the current line up to cursor
+        let Some(current_code) = self
+            .code_map
+            .get(params.text_document_position.text_document.uri.as_ref())
+        else {
+            return Ok(Some(CompletionResponse::Array(completions)));
+        };
+        let Ok(current_code) = std::str::from_utf8(&current_code) else {
+            return Ok(Some(CompletionResponse::Array(completions)));
+        };
+
+        // Get the current line up to cursor, with bounds checking
+        if let Some(line) = current_code
+            .lines()
+            .nth(params.text_document_position.position.line as usize)
+        {
+            let char_pos = params.text_document_position.position.character as usize;
+            if char_pos <= line.len() {
+                let line_prefix = &line[..char_pos];
+                // Get last word
+                let last_word = line_prefix
+                    .split(|c: char| c.is_whitespace() || c.is_ascii_punctuation())
+                    .last()
+                    .unwrap_or("");
+
+                // If the last word starts with a digit, return no completions
+                if !last_word.is_empty() && last_word.chars().next().unwrap().is_ascii_digit() {
+                    return Ok(None);
+                }
+            }
+        }
+
         completions.extend(self.stdlib_completions.values().cloned());
 
         // Add more to the completions if we have more.
@@ -1203,11 +1301,8 @@ impl LanguageServer for Backend {
         // Parse the ast.
         // I don't know if we need to do this again since it should be updated in the context.
         // But I figure better safe than sorry since this will write back out to the file.
-        let Ok(tokens) = crate::token::lexer(current_code) else {
-            return Ok(None);
-        };
-        let parser = crate::parser::Parser::new(tokens);
-        let Ok(ast) = parser.ast() else {
+        let module_id = ModuleId::default();
+        let Ok(ast) = crate::parser::parse_str(current_code, module_id).parse_errs_as_err() else {
             return Ok(None);
         };
         // Now recast it.
@@ -1219,7 +1314,7 @@ impl LanguageServer for Backend {
             },
             0,
         );
-        let source_range = SourceRange([0, current_code.len()]);
+        let source_range = SourceRange::new(0, current_code.len(), module_id);
         let range = source_range.to_lsp_range(current_code);
         Ok(Some(vec![TextEdit {
             new_text: recast,
@@ -1240,11 +1335,8 @@ impl LanguageServer for Backend {
         // Parse the ast.
         // I don't know if we need to do this again since it should be updated in the context.
         // But I figure better safe than sorry since this will write back out to the file.
-        let Ok(tokens) = crate::token::lexer(current_code) else {
-            return Ok(None);
-        };
-        let parser = crate::parser::Parser::new(tokens);
-        let Ok(mut ast) = parser.ast() else {
+        let module_id = ModuleId::default();
+        let Ok(mut ast) = crate::parser::parse_str(current_code, module_id).parse_errs_as_err() else {
             return Ok(None);
         };
 
@@ -1254,7 +1346,7 @@ impl LanguageServer for Backend {
         ast.rename_symbol(&params.new_name, pos);
         // Now recast it.
         let recast = ast.recast(&Default::default(), 0);
-        let source_range = SourceRange([0, current_code.len() - 1]);
+        let source_range = SourceRange::new(0, current_code.len() - 1, module_id);
         let range = source_range.to_lsp_range(current_code);
         Ok(Some(WorkspaceEdit {
             changes: Some(HashMap::from([(

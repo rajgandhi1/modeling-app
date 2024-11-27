@@ -2,11 +2,12 @@ use std::collections::BTreeMap;
 
 use pretty_assertions::assert_eq;
 use tower_lsp::{
-    lsp_types::{SemanticTokenModifier, SemanticTokenType},
+    lsp_types::{Diagnostic, SemanticTokenModifier, SemanticTokenType},
     LanguageServer,
 };
 
 use crate::{
+    ast::types::{Node, Program},
     executor::ProgramMemory,
     lsp::test_util::{copilot_lsp_server, kcl_lsp_server},
 };
@@ -1070,7 +1071,7 @@ fn myFn = (param1) => {
 
     // Get the ast.
     let ast = server.ast_map.get("file:///test.kcl").unwrap().clone();
-    assert!(ast != crate::ast::types::Program::default());
+    assert!(ast != Node::<Program>::default());
 
     // Send semantic tokens request.
     let semantic_tokens = server
@@ -1568,7 +1569,7 @@ insideRevolve = startSketchOn('XZ')
   |> line([0, -thickness], %)
   |> line([-overHangLength, 0], %)
   |> close(%)
-  |> revolve({ axis: 'y' }, %)
+  |> revolve({ axis = 'y' }, %)
 
 // Sketch and revolve one of the balls and duplicate it using a circular pattern. (This is currently a workaround, we have a bug with rotating on a sketch that touches the rotation axis)
 sphere = startSketchOn('XZ')
@@ -1578,18 +1579,18 @@ sphere = startSketchOn('XZ')
      ], %)
   |> line([sphereDia - 0.1, 0], %)
   |> arc({
-       angle_start: 0,
-       angle_end: -180,
-       radius: sphereDia / 2 - 0.05
+       angle_start = 0,
+       angle_end = -180,
+       radius = sphereDia / 2 - 0.05
      }, %)
   |> close(%)
-  |> revolve({ axis: 'x' }, %)
+  |> revolve({ axis = 'x' }, %)
   |> patternCircular3d({
-       axis: [0, 0, 1],
-       center: [0, 0, 0],
-       repetitions: 10,
-       arcDegrees: 360,
-       rotateDuplicates: true
+       axis = [0, 0, 1],
+       center = [0, 0, 0],
+       repetitions = 10,
+       arcDegrees = 360,
+       rotateDuplicates = true
      }, %)
 
 // Sketch and revolve the outside bearing
@@ -1607,7 +1608,7 @@ outsideRevolve = startSketchOn('XZ')
   |> line([0, thickness], %)
   |> line([overHangLength - thickness, 0], %)
   |> close(%)
-  |> revolve({ axis: 'y' }, %)"#
+  |> revolve({ axis = 'y' }, %)"#
     );
 }
 
@@ -2368,7 +2369,14 @@ async fn kcl_test_kcl_lsp_diagnostics_on_execution_error() {
 
     // Get the diagnostics.
     let diagnostics = server.diagnostics_map.get("file:///test.kcl");
-    assert!(diagnostics.is_none());
+    if let Some(diagnostics) = diagnostics {
+        let ds: Vec<Diagnostic> = diagnostics.to_owned();
+        eprintln!("Expected no diagnostics, but found some.");
+        for d in ds {
+            eprintln!("{:?}: {}", d.severity, d.message);
+        }
+        panic!();
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -2396,7 +2404,7 @@ async fn kcl_test_kcl_lsp_full_to_empty_file_updates_ast_and_memory() {
 
     // Get the ast.
     let ast = server.ast_map.get("file:///test.kcl").unwrap().clone();
-    assert!(ast != crate::ast::types::Program::default());
+    assert!(ast != Node::<Program>::default());
     // Get the memory.
     let memory = server.memory_map.get("file:///test.kcl").unwrap().clone();
     assert!(memory != ProgramMemory::default());
@@ -2416,7 +2424,7 @@ async fn kcl_test_kcl_lsp_full_to_empty_file_updates_ast_and_memory() {
         })
         .await;
 
-    let mut default_hashed = crate::ast::types::Program::default();
+    let mut default_hashed = Node::<Program>::default();
     default_hashed.compute_digest();
 
     // Get the ast.
@@ -2453,7 +2461,7 @@ async fn kcl_test_kcl_lsp_code_unchanged_but_has_diagnostics_reexecute() {
 
     // Get the ast.
     let ast = server.ast_map.get("file:///test.kcl").unwrap().clone();
-    assert!(ast != crate::ast::types::Program::default());
+    assert!(ast != Node::<Program>::default());
     // Get the memory.
     let memory = server.memory_map.get("file:///test.kcl").unwrap().clone();
     assert!(memory != ProgramMemory::default());
@@ -2487,9 +2495,9 @@ async fn kcl_test_kcl_lsp_code_unchanged_but_has_diagnostics_reexecute() {
     // Clear the ast and memory.
     server
         .ast_map
-        .insert("file:///test.kcl".to_string(), crate::ast::types::Program::default());
+        .insert("file:///test.kcl".to_string(), Node::<Program>::default());
     let ast = server.ast_map.get("file:///test.kcl").unwrap().clone();
-    assert_eq!(ast, crate::ast::types::Program::default());
+    assert_eq!(ast, Node::<Program>::default());
     server
         .memory_map
         .insert("file:///test.kcl".to_string(), ProgramMemory::default());
@@ -2513,7 +2521,7 @@ async fn kcl_test_kcl_lsp_code_unchanged_but_has_diagnostics_reexecute() {
 
     // Get the ast.
     let ast = server.ast_map.get("file:///test.kcl").unwrap().clone();
-    assert!(ast != crate::ast::types::Program::default());
+    assert!(ast != Node::<Program>::default());
     // Get the memory.
     let memory = server.memory_map.get("file:///test.kcl").unwrap().clone();
     assert!(memory != ProgramMemory::default());
@@ -2549,7 +2557,7 @@ async fn kcl_test_kcl_lsp_code_and_ast_unchanged_but_has_diagnostics_reexecute()
 
     // Get the ast.
     let ast = server.ast_map.get("file:///test.kcl").unwrap().clone();
-    assert!(ast != crate::ast::types::Program::default());
+    assert!(ast != Node::<Program>::default());
     // Get the memory.
     let memory = server.memory_map.get("file:///test.kcl").unwrap().clone();
     assert!(memory != ProgramMemory::default());
@@ -2604,7 +2612,7 @@ async fn kcl_test_kcl_lsp_code_and_ast_unchanged_but_has_diagnostics_reexecute()
 
     // Get the ast.
     let ast = server.ast_map.get("file:///test.kcl").unwrap().clone();
-    assert!(ast != crate::ast::types::Program::default());
+    assert!(ast != Node::<Program>::default());
     // Get the memory.
     let memory = server.memory_map.get("file:///test.kcl").unwrap().clone();
     assert!(memory != ProgramMemory::default());
@@ -2640,7 +2648,7 @@ async fn kcl_test_kcl_lsp_code_and_ast_units_unchanged_but_has_diagnostics_reexe
 
     // Get the ast.
     let ast = server.ast_map.get("file:///test.kcl").unwrap().clone();
-    assert!(ast != crate::ast::types::Program::default());
+    assert!(ast != Node::<Program>::default());
     // Get the memory.
     let memory = server.memory_map.get("file:///test.kcl").unwrap().clone();
     assert!(memory != ProgramMemory::default());
@@ -2698,7 +2706,7 @@ async fn kcl_test_kcl_lsp_code_and_ast_units_unchanged_but_has_diagnostics_reexe
 
     // Get the ast.
     let ast = server.ast_map.get("file:///test.kcl").unwrap().clone();
-    assert!(ast != crate::ast::types::Program::default());
+    assert!(ast != Node::<Program>::default());
     // Get the memory.
     let memory = server.memory_map.get("file:///test.kcl").unwrap().clone();
     assert!(memory != ProgramMemory::default());
@@ -2734,7 +2742,7 @@ async fn kcl_test_kcl_lsp_code_and_ast_units_unchanged_but_has_memory_reexecute_
 
     // Get the ast.
     let ast = server.ast_map.get("file:///test.kcl").unwrap().clone();
-    assert!(ast != crate::ast::types::Program::default());
+    assert!(ast != Node::<Program>::default());
     // Get the memory.
     let memory = server.memory_map.get("file:///test.kcl").unwrap().clone();
     assert!(memory != ProgramMemory::default());
@@ -2770,7 +2778,7 @@ async fn kcl_test_kcl_lsp_code_and_ast_units_unchanged_but_has_memory_reexecute_
 
     // Get the ast.
     let ast = server.ast_map.get("file:///test.kcl").unwrap().clone();
-    assert!(ast != crate::ast::types::Program::default());
+    assert!(ast != Node::<Program>::default());
     // Get the memory.
     let memory = server.memory_map.get("file:///test.kcl").unwrap().clone();
     assert!(memory != ProgramMemory::default());
@@ -2806,7 +2814,7 @@ async fn kcl_test_kcl_lsp_cant_execute_set() {
 
     // Get the ast.
     let ast = server.ast_map.get("file:///test.kcl").unwrap().clone();
-    assert!(ast != crate::ast::types::Program::default());
+    assert!(ast != Node::<Program>::default());
     // Get the memory.
     let memory = server.memory_map.get("file:///test.kcl").unwrap().clone();
     assert!(memory != ProgramMemory::default());
@@ -2841,7 +2849,7 @@ async fn kcl_test_kcl_lsp_cant_execute_set() {
 
     // Get the ast.
     let ast = server.ast_map.get("file:///test.kcl").unwrap().clone();
-    assert!(ast != crate::ast::types::Program::default());
+    assert!(ast != Node::<Program>::default());
     // Get the memory.
     let memory = server.memory_map.get("file:///test.kcl").unwrap().clone();
     assert!(memory != ProgramMemory::default());
@@ -2883,7 +2891,7 @@ async fn kcl_test_kcl_lsp_cant_execute_set() {
     let units = server.executor_ctx().await.clone().unwrap().settings.units;
     assert_eq!(units, crate::settings::types::UnitLength::Mm);
 
-    let mut default_hashed = crate::ast::types::Program::default();
+    let mut default_hashed = Node::<Program>::default();
     default_hashed.compute_digest();
 
     // Get the ast.
@@ -2924,7 +2932,7 @@ async fn kcl_test_kcl_lsp_cant_execute_set() {
 
     // Get the ast.
     let ast = server.ast_map.get("file:///test.kcl").unwrap().clone();
-    assert!(ast != crate::ast::types::Program::default());
+    assert!(ast != Node::<Program>::default());
     // Get the memory.
     let memory = server.memory_map.get("file:///test.kcl").unwrap().clone();
     // Now it should NOT be the default memory.
@@ -3064,7 +3072,7 @@ const part001 = startSketchOn('XY')
 
     // Get the ast.
     let ast = server.ast_map.get("file:///test.kcl").unwrap().clone();
-    assert!(ast != crate::ast::types::Program::default());
+    assert!(ast != Node::<Program>::default());
 
     // Assure we have one diagnostics.
     let diagnostics = server.diagnostics_map.get("file:///test.kcl").unwrap().clone();
@@ -3087,7 +3095,7 @@ const part001 = startSketchOn('XY')
 
     // Get the ast.
     let ast = server.ast_map.get("file:///test.kcl").unwrap().clone();
-    assert!(ast != crate::ast::types::Program::default());
+    assert!(ast != Node::<Program>::default());
 
     // Assure we have one diagnostics.
     let diagnostics = server.diagnostics_map.get("file:///test.kcl").unwrap().clone();
@@ -3183,7 +3191,7 @@ const part001 = startSketchOn('XY')
 
     // Get the ast.
     let ast = server.ast_map.get("file:///test.kcl").unwrap().clone();
-    assert!(ast != crate::ast::types::Program::default());
+    assert!(ast != Node::<Program>::default());
     // Get the memory.
     let memory = server.memory_map.get("file:///test.kcl");
     assert!(memory.is_none());
@@ -3205,7 +3213,7 @@ const part001 = startSketchOn('XY')
 
     // Get the ast.
     let ast = server.ast_map.get("file:///test.kcl").unwrap().clone();
-    assert!(ast != crate::ast::types::Program::default());
+    assert!(ast != Node::<Program>::default());
     // Get the memory.
     let memory = server.memory_map.get("file:///test.kcl");
     assert!(memory.is_none());
@@ -3248,7 +3256,7 @@ const part001 = startSketchOn('XY')
 
     // Get the ast.
     let ast = server.ast_map.get("file:///test.kcl").unwrap().clone();
-    assert!(ast != crate::ast::types::Program::default());
+    assert!(ast != Node::<Program>::default());
     // Get the memory.
     let memory = server.memory_map.get("file:///test.kcl");
     assert!(memory.is_none());
@@ -3278,7 +3286,7 @@ const NEW_LINT = 1"#
 
     // Get the ast.
     let ast = server.ast_map.get("file:///test.kcl").unwrap().clone();
-    assert!(ast != crate::ast::types::Program::default());
+    assert!(ast != Node::<Program>::default());
     // Get the memory.
     let memory = server.memory_map.get("file:///test.kcl");
     assert!(memory.is_none());
@@ -3394,7 +3402,7 @@ const part001 = startSketchOn('XY')
 
     // Get the ast.
     let ast = server.ast_map.get("file:///test.kcl").unwrap().clone();
-    assert!(ast != crate::ast::types::Program::default());
+    assert!(ast != Node::<Program>::default());
 
     // Get the symbols map.
     let symbols_map = server.symbols_map.get("file:///test.kcl").unwrap().clone();
@@ -3489,7 +3497,7 @@ const part001 = startSketchOn('XY')
 
     // Get the ast.
     let ast = server.ast_map.get("file:///test.kcl").unwrap().clone();
-    assert!(ast != crate::ast::types::Program::default());
+    assert!(ast != Node::<Program>::default());
 
     // Get the symbols map.
     let symbols_map = server.symbols_map.get("file:///test.kcl").unwrap().clone();
@@ -3532,7 +3540,7 @@ const part001 = startSketchOn('XY')
 
     // Get the ast.
     let ast = server.ast_map.get("file:///test.kcl").unwrap().clone();
-    assert!(ast != crate::ast::types::Program::default());
+    assert!(ast != Node::<Program>::default());
 
     // Get the symbols map.
     let symbols_map = server.symbols_map.get("file:///test.kcl").unwrap().clone();
@@ -3550,4 +3558,37 @@ const part001 = startSketchOn('XY')
     let diagnostics = server.diagnostics_map.get("file:///test.kcl").unwrap().clone();
     // Check the diagnostics.
     assert_eq!(diagnostics.len(), 2);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn kcl_test_kcl_lsp_completions_number_literal() {
+    let server = kcl_lsp_server(false).await.unwrap();
+
+    server
+        .did_open(tower_lsp::lsp_types::DidOpenTextDocumentParams {
+            text_document: tower_lsp::lsp_types::TextDocumentItem {
+                uri: "file:///test.kcl".try_into().unwrap(),
+                language_id: "kcl".to_string(),
+                version: 1,
+                text: "const thing = 10".to_string(),
+            },
+        })
+        .await;
+
+    let completions = server
+        .completion(tower_lsp::lsp_types::CompletionParams {
+            text_document_position: tower_lsp::lsp_types::TextDocumentPositionParams {
+                text_document: tower_lsp::lsp_types::TextDocumentIdentifier {
+                    uri: "file:///test.kcl".try_into().unwrap(),
+                },
+                position: tower_lsp::lsp_types::Position { line: 0, character: 15 },
+            },
+            context: None,
+            partial_result_params: Default::default(),
+            work_done_progress_params: Default::default(),
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(completions.is_none(), true);
 }

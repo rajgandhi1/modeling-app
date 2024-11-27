@@ -45,7 +45,9 @@ export const commonPoints = {
   startAt: '[7.19, -9.7]',
   num1: 7.25,
   num2: 14.44,
-}
+  /** The Y-value of a common lineTo move we perform in tests */
+  num3: -2.44,
+} as const
 
 /** A semi-reliable color to check the default XZ plane on
  * in dark mode in the default camera position
@@ -118,15 +120,32 @@ async function waitForDefaultPlanesToBeVisible(page: Page) {
   )
 }
 
-async function openPane(page: Page, testId: string) {
-  const locator = page.getByTestId(testId)
-  await expect(locator).toBeVisible()
-  const isOpen = (await locator?.getAttribute('aria-pressed')) === 'true'
+export async function checkIfPaneIsOpen(page: Page, testId: string) {
+  const paneButtonLocator = page.getByTestId(testId)
+  await expect(paneButtonLocator).toBeVisible()
+  return (await paneButtonLocator?.getAttribute('aria-pressed')) === 'true'
+}
+
+export async function openPane(page: Page, testId: string) {
+  const paneButtonLocator = page.getByTestId(testId)
+  await expect(paneButtonLocator).toBeVisible()
+  const isOpen = await checkIfPaneIsOpen(page, testId)
 
   if (!isOpen) {
-    await locator.click()
-    await expect(locator).toHaveAttribute('aria-pressed', 'true')
+    await paneButtonLocator.click()
   }
+  await expect(paneButtonLocator).toHaveAttribute('aria-pressed', 'true')
+}
+
+export async function closePane(page: Page, testId: string) {
+  const paneButtonLocator = page.getByTestId(testId)
+  await expect(paneButtonLocator).toBeVisible()
+  const isOpen = await checkIfPaneIsOpen(page, testId)
+
+  if (isOpen) {
+    await paneButtonLocator.click()
+  }
+  await expect(paneButtonLocator).toHaveAttribute('aria-pressed', 'false')
 }
 
 async function openKclCodePanel(page: Page) {
@@ -286,7 +305,7 @@ export const getMovementUtils = (opts: any) => {
     return [last.x, last.y]
   }
 
-  return { toSU, click00r }
+  return { toSU, toU, click00r }
 }
 
 async function waitForAuthAndLsp(page: Page) {
@@ -467,20 +486,6 @@ export async function getUtils(page: Page, test_?: typeof test) {
       return text.replace(/\s+/g, '')
     },
 
-    createAndSelectProject: async (hasText: string) => {
-      return test_?.step(
-        `Create and select project with text "${hasText}"`,
-        async () => {
-          // Without this, we get unreliable project creation. It's probably
-          // due to a race between the FS being read and clicking doing something.
-          await page.waitForTimeout(100)
-          await page.getByTestId('home-new-file').click()
-          const projectLinksPost = page.getByTestId('project-link')
-          await projectLinksPost.filter({ hasText }).click()
-        }
-      )
-    },
-
     editorTextMatches: async (code: string) => {
       const editor = page.locator(editorSelector)
       return expect(editor).toHaveText(code, { useInnerText: true })
@@ -520,6 +525,9 @@ export async function getUtils(page: Page, test_?: typeof test) {
           .locator('[data-testid="file-pane-scroll-container"] button')
           .filter({ hasText: name })
           .click()
+        await expect(page.getByTestId('project-sidebar-toggle')).toContainText(
+          name
+        )
       })
     },
 
@@ -980,30 +988,25 @@ export async function isOutOfViewInScrollContainer(
   return isOutOfView
 }
 
-export async function createProjectAndRenameIt({
+export async function createProject({
   name,
   page,
+  returnHome = false,
 }: {
   name: string
   page: Page
+  returnHome?: boolean
 }) {
-  await page.getByRole('button', { name: 'New project' }).click()
-  await expect(page.getByText('Successfully created')).toBeVisible()
-  await expect(page.getByText('Successfully created')).not.toBeVisible()
+  await test.step(`Create project and navigate to it`, async () => {
+    await page.getByRole('button', { name: 'New project' }).click()
+    await page.getByRole('textbox', { name: 'Name' }).fill(name)
+    await page.getByRole('button', { name: 'Continue' }).click()
 
-  await expect(page.getByText(`project-000`)).toBeVisible()
-  await page.getByText(`project-000`).hover()
-  await page.getByText(`project-000`).focus()
-
-  await page.getByLabel('sketch').first().click()
-
-  await page.waitForTimeout(100)
-
-  // type the name passed in
-  await page.keyboard.press('Backspace')
-  await page.keyboard.type(name)
-
-  await page.getByLabel('checkmark').last().click()
+    if (returnHome) {
+      await page.waitForURL('**/file/**', { waitUntil: 'domcontentloaded' })
+      await page.getByTestId('app-logo').click()
+    }
+  })
 }
 
 export function executorInputPath(fileName: string): string {

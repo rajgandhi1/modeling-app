@@ -13,6 +13,10 @@ import { AllSettingsFields } from 'components/Settings/AllSettingsFields'
 import { AllKeybindingsFields } from 'components/Settings/AllKeybindingsFields'
 import { KeybindingsSectionsList } from 'components/Settings/KeybindingsSectionsList'
 
+export const PACKAGE_NAME = isDesktop()
+  ? window.electron.packageJson.name
+  : 'zoo-modeling-app'
+
 export const Settings = () => {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()

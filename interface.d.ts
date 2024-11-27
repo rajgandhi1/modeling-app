@@ -2,7 +2,7 @@ import fs from 'node:fs/promises'
 import fsSync from 'node:fs'
 import path from 'path'
 import { dialog, shell } from 'electron'
-import { MachinesListing } from 'lib/machineManager'
+import { MachinesListing } from 'components/MachineManagerProvider'
 
 type EnvFn = (value?: string) => string
 
@@ -78,6 +78,7 @@ export interface IElectronAPI {
   ) => Electron.IpcRenderer
   onUpdateError: (callback: (value: { error: Error }) => void) => Electron
   appRestart: () => void
+  getArgvParsed: () => any
 }
 
 declare global {

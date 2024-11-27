@@ -1,5 +1,11 @@
 import { useMachine } from '@xstate/react'
-import React, { createContext, useEffect, useMemo, useRef } from 'react'
+import React, {
+  createContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useContext,
+} from 'react'
 import {
   Actor,
   AnyStateMachine,
@@ -28,7 +34,7 @@ import {
   editorManager,
   sceneEntitiesManager,
 } from 'lib/singletons'
-import { machineManager } from 'lib/machineManager'
+import { MachineManagerContext } from 'components/MachineManagerProvider'
 import { useHotkeys } from 'react-hotkeys-hook'
 import { applyConstraintHorzVertDistance } from './Toolbar/SetHorzVertDistance'
 import {
@@ -37,12 +43,12 @@ import {
 } from './Toolbar/SetAngleBetween'
 import { applyConstraintAngleLength } from './Toolbar/setAngleLength'
 import {
-  Selections,
   canSweepSelection,
   handleSelectionBatch,
   isSelectionLastLine,
   isRangeBetweenCharacters,
   isSketchPipe,
+  Selections,
   updateSelections,
 } from 'lib/selections'
 import { applyConstraintIntersect } from './Toolbar/Intersect'
@@ -57,6 +63,7 @@ import {
 import {
   moveValueIntoNewVariablePath,
   sketchOnExtrudedFace,
+  sketchOnOffsetPlane,
   startSketchOnDefault,
 } from 'lang/modifyAst'
 import { Program, parse, recast } from 'lang/wasm'
@@ -85,6 +92,7 @@ import { submitAndAwaitTextToKcl } from 'lib/textToCad'
 import { useFileContext } from 'hooks/useFileContext'
 import { uuidv4 } from 'lib/utils'
 import { IndexLoaderData } from 'lib/types'
+import { Node } from 'wasm-lib/kcl/bindings/Node'
 
 type MachineContext<T extends AnyStateMachine> = {
   state: StateFrom<T>
@@ -141,6 +149,8 @@ export const ModelingMachineProvider = ({
   //   >
   // )
 
+  const machineManager = useContext(MachineManagerContext)
+
   const [modelingState, modelingSend, modelingActor] = useMachine(
     modelingMachine.provide({
       actions: {
@@ -150,36 +160,39 @@ export const ModelingMachineProvider = ({
         'enable copilot': () => {
           editorManager.setCopilotEnabled(true)
         },
-        'sketch exit execute': ({ context: { store } }) => {
-          ;(async () => {
-            // When cancelling the sketch mode we should disable sketch mode within the engine.
-            await engineCommandManager.sendSceneCommand({
-              type: 'modeling_cmd_req',
-              cmd_id: uuidv4(),
-              cmd: { type: 'sketch_mode_disable' },
-            })
+        // tsc reports this typing as perfectly fine, but eslint is complaining.
+        // It's actually nonsensical, so I'm quieting.
+        // eslint-disable-next-line @typescript-eslint/no-misused-promises
+        'sketch exit execute': async ({
+          context: { store },
+        }): Promise<void> => {
+          // When cancelling the sketch mode we should disable sketch mode within the engine.
+          await engineCommandManager.sendSceneCommand({
+            type: 'modeling_cmd_req',
+            cmd_id: uuidv4(),
+            cmd: { type: 'sketch_mode_disable' },
+          })
 
-            sceneInfra.camControls.syncDirection = 'clientToEngine'
+          sceneInfra.camControls.syncDirection = 'clientToEngine'
 
-            if (cameraProjection.current === 'perspective') {
-              await sceneInfra.camControls.snapToPerspectiveBeforeHandingBackControlToEngine()
-            }
+          if (cameraProjection.current === 'perspective') {
+            await sceneInfra.camControls.snapToPerspectiveBeforeHandingBackControlToEngine()
+          }
 
-            sceneInfra.camControls.syncDirection = 'engineToClient'
+          sceneInfra.camControls.syncDirection = 'engineToClient'
 
-            store.videoElement?.pause()
+          store.videoElement?.pause()
 
-            kclManager
-              .executeCode()
-              .then(() => {
-                if (engineCommandManager.engineConnection?.idleMode) return
+          return kclManager
+            .executeCode()
+            .then(() => {
+              if (engineCommandManager.engineConnection?.idleMode) return
 
-                store.videoElement?.play().catch((e) => {
-                  console.warn('Video playing was prevented', e)
-                })
+              store.videoElement?.play().catch((e) => {
+                console.warn('Video playing was prevented', e)
               })
-              .catch(reportRejection)
-          })().catch(reportRejection)
+            })
+            .catch(reportRejection)
         },
         'Set mouse state': assign(({ context, event }) => {
           if (event.type !== 'Set mouse state') return {}
@@ -293,6 +306,7 @@ export const ModelingMachineProvider = ({
             const dispatchSelection = (selection?: EditorSelection) => {
               if (!selection) return // TODO less of hack for the below please
               if (!editorManager.editorView) return
+
               setTimeout(() => {
                 if (!editorManager.editorView) return
                 editorManager.editorView.dispatch({
@@ -304,8 +318,9 @@ export const ModelingMachineProvider = ({
                 })
               })
             }
+
             let selections: Selections = {
-              codeBasedSelections: [],
+              graphSelections: [],
               otherSelections: [],
             }
             if (setSelections.selectionType === 'singleCodeCursor') {
@@ -315,7 +330,7 @@ export const ModelingMachineProvider = ({
                 !editorManager.isShiftDown
               ) {
                 selections = {
-                  codeBasedSelections: [],
+                  graphSelections: [],
                   otherSelections: [],
                 }
               } else if (
@@ -323,13 +338,13 @@ export const ModelingMachineProvider = ({
                 !editorManager.isShiftDown
               ) {
                 selections = {
-                  codeBasedSelections: [setSelections.selection],
+                  graphSelections: [setSelections.selection],
                   otherSelections: [],
                 }
               } else if (setSelections.selection && editorManager.isShiftDown) {
                 selections = {
-                  codeBasedSelections: [
-                    ...selectionRanges.codeBasedSelections,
+                  graphSelections: [
+                    ...selectionRanges.graphSelections,
                     setSelections.selection,
                   ],
                   otherSelections: selectionRanges.otherSelections,
@@ -362,32 +377,26 @@ export const ModelingMachineProvider = ({
               }
             }
 
-            if (setSelections.selectionType === 'otherSelection') {
+            if (
+              setSelections.selectionType === 'axisSelection' ||
+              setSelections.selectionType === 'defaultPlaneSelection'
+            ) {
               if (editorManager.isShiftDown) {
                 selections = {
-                  codeBasedSelections: selectionRanges.codeBasedSelections,
+                  graphSelections: selectionRanges.graphSelections,
                   otherSelections: [setSelections.selection],
                 }
               } else {
                 selections = {
-                  codeBasedSelections: [],
+                  graphSelections: [],
                   otherSelections: [setSelections.selection],
                 }
               }
-              const { engineEvents, updateSceneObjectColors } =
-                handleSelectionBatch({
-                  selections,
-                })
-              engineEvents &&
-                engineEvents.forEach((event) => {
-                  // eslint-disable-next-line @typescript-eslint/no-floating-promises
-                  engineCommandManager.sendSceneCommand(event)
-                })
-              updateSceneObjectColors()
               return {
                 selectionRanges: selections,
               }
             }
+
             if (setSelections.selectionType === 'completeSelection') {
               editorManager.selectRange(setSelections.selection)
               if (!sketchDetails)
@@ -409,7 +418,7 @@ export const ModelingMachineProvider = ({
             return {}
           }
         ),
-        Make: ({ event }) => {
+        Make: ({ context, event }) => {
           if (event.type !== 'Make') return
           // Check if we already have an export intent.
           if (engineCommandManager.exportInfo) {
@@ -423,7 +432,21 @@ export const ModelingMachineProvider = ({
           }
 
           // Set the current machine.
-          machineManager.currentMachine = event.data.machine
+          // Due to our use of singeton pattern, we need to do this to reliably
+          // update this object across React and non-React boundary.
+          // We need to do this eagerly because of the exportToEngine call below.
+          if (engineCommandManager.machineManager === null) {
+            console.warn(
+              "engineCommandManager.machineManager is null. It shouldn't be at this point. Aborting operation."
+            )
+            return
+          } else {
+            engineCommandManager.machineManager.currentMachine =
+              event.data.machine
+          }
+
+          // Update the rest of the UI that needs to know the current machine
+          context.machineManager.setCurrentMachine(event.data.machine)
 
           const format: Models['OutputFormat_type'] = {
             type: 'stl',
@@ -457,7 +480,7 @@ export const ModelingMachineProvider = ({
           engineCommandManager.exportInfo = {
             intent: ExportIntent.Save,
             // This never gets used its only for make.
-            name: '',
+            name: file?.name?.replace('.kcl', `.${event.data.type}`) || '',
           }
 
           const format = {
@@ -531,7 +554,7 @@ export const ModelingMachineProvider = ({
           // A user can begin extruding if they either have 1+ faces selected or nothing selected
           // TODO: I believe this guard only allows for extruding a single face at a time
           const hasNoSelection =
-            selectionRanges.codeBasedSelections.length === 0 ||
+            selectionRanges.graphSelections.length === 0 ||
             isRangeBetweenCharacters(selectionRanges) ||
             isSelectionLastLine(selectionRanges, codeManager.code)
 
@@ -543,21 +566,24 @@ export const ModelingMachineProvider = ({
           }
           if (!isSketchPipe(selectionRanges)) return false
 
-          return canSweepSelection(selectionRanges)
+          const canSweep = canSweepSelection(selectionRanges)
+          if (err(canSweep)) return false
+          return canSweep
         },
         'has valid selection for deletion': ({
           context: { selectionRanges },
         }) => {
           if (!commandBarState.matches('Closed')) return false
-          if (selectionRanges.codeBasedSelections.length <= 0) return false
+          if (selectionRanges.graphSelections.length <= 0) return false
           return true
         },
-        'has valid fillet selection': ({ context: { selectionRanges } }) =>
-          hasValidFilletSelection({
+        'has valid fillet selection': ({ context: { selectionRanges } }) => {
+          return hasValidFilletSelection({
             selectionRanges,
             ast: kclManager.ast,
             code: codeManager.code,
-          }),
+          })
+        },
         'Selection is on face': ({ context: { selectionRanges }, event }) => {
           if (event.type !== 'Enter sketch') return false
           if (event.data?.forceNewSketch) return false
@@ -610,13 +636,16 @@ export const ModelingMachineProvider = ({
         ),
         'animate-to-face': fromPromise(async ({ input }) => {
           if (!input) return undefined
-          if (input.type === 'extrudeFace') {
-            const sketched = sketchOnExtrudedFace(
-              kclManager.ast,
-              input.sketchPathToNode,
-              input.extrudePathToNode,
-              input.faceInfo
-            )
+          if (input.type === 'extrudeFace' || input.type === 'offsetPlane') {
+            const sketched =
+              input.type === 'extrudeFace'
+                ? sketchOnExtrudedFace(
+                    kclManager.ast,
+                    input.sketchPathToNode,
+                    input.extrudePathToNode,
+                    input.faceInfo
+                  )
+                : sketchOnOffsetPlane(kclManager.ast, input.pathToNode)
             if (err(sketched)) {
               const sketchedError = new Error(
                 'Incompatible face, please try another'
@@ -628,10 +657,9 @@ export const ModelingMachineProvider = ({
 
             await kclManager.executeAstMock(modifiedAst)
 
-            await letEngineAnimateAndSyncCamAfter(
-              engineCommandManager,
-              input.faceId
-            )
+            const id =
+              input.type === 'extrudeFace' ? input.faceId : input.planeId
+            await letEngineAnimateAndSyncCamAfter(engineCommandManager, id)
             sceneInfra.camControls.syncDirection = 'clientToEngine'
             return {
               sketchPathToNode: pathToNewSketchNode,
@@ -645,6 +673,7 @@ export const ModelingMachineProvider = ({
             input.plane
           )
           await kclManager.updateAst(modifiedAst, false)
+          sceneInfra.camControls.enableRotate = false
           sceneInfra.camControls.syncDirection = 'clientToEngine'
 
           await letEngineAnimateAndSyncCamAfter(
@@ -661,7 +690,8 @@ export const ModelingMachineProvider = ({
         }),
         'animate-to-sketch': fromPromise(
           async ({ input: { selectionRanges } }) => {
-            const sourceRange = selectionRanges.codeBasedSelections[0].range
+            const sourceRange =
+              selectionRanges.graphSelections[0]?.codeRef?.range
             const sketchPathToNode = getNodePathFromSourceRange(
               kclManager.ast,
               sourceRange
@@ -683,6 +713,7 @@ export const ModelingMachineProvider = ({
             }
           }
         ),
+
         'Get horizontal info': fromPromise(
           async ({ input: { selectionRanges, sketchDetails } }) => {
             const { modifiedAst, pathToNodeMap } =
@@ -706,6 +737,11 @@ export const ModelingMachineProvider = ({
                 sketchDetails.origin
               )
             if (err(updatedAst)) return Promise.reject(updatedAst)
+
+            await codeManager.updateEditorWithAstAndWriteToFile(
+              updatedAst.newAst
+            )
+
             const selection = updateSelections(
               pathToNodeMap,
               selectionRanges,
@@ -742,6 +778,11 @@ export const ModelingMachineProvider = ({
                 sketchDetails.origin
               )
             if (err(updatedAst)) return Promise.reject(updatedAst)
+
+            await codeManager.updateEditorWithAstAndWriteToFile(
+              updatedAst.newAst
+            )
+
             const selection = updateSelections(
               pathToNodeMap,
               selectionRanges,
@@ -787,6 +828,11 @@ export const ModelingMachineProvider = ({
                 sketchDetails.origin
               )
             if (err(updatedAst)) return Promise.reject(updatedAst)
+
+            await codeManager.updateEditorWithAstAndWriteToFile(
+              updatedAst.newAst
+            )
+
             const selection = updateSelections(
               pathToNodeMap,
               selectionRanges,
@@ -803,7 +849,9 @@ export const ModelingMachineProvider = ({
         'Get length info': fromPromise(
           async ({ input: { selectionRanges, sketchDetails } }) => {
             const { modifiedAst, pathToNodeMap } =
-              await applyConstraintAngleLength({ selectionRanges })
+              await applyConstraintAngleLength({
+                selectionRanges,
+              })
             const _modifiedAst = parse(recast(modifiedAst))
             if (!sketchDetails)
               return Promise.reject(new Error('No sketch details'))
@@ -820,6 +868,11 @@ export const ModelingMachineProvider = ({
                 sketchDetails.origin
               )
             if (err(updatedAst)) return Promise.reject(updatedAst)
+
+            await codeManager.updateEditorWithAstAndWriteToFile(
+              updatedAst.newAst
+            )
+
             const selection = updateSelections(
               pathToNodeMap,
               selectionRanges,
@@ -855,6 +908,11 @@ export const ModelingMachineProvider = ({
                 sketchDetails.origin
               )
             if (err(updatedAst)) return Promise.reject(updatedAst)
+
+            await codeManager.updateEditorWithAstAndWriteToFile(
+              updatedAst.newAst
+            )
+
             const selection = updateSelections(
               pathToNodeMap,
               selectionRanges,
@@ -891,6 +949,11 @@ export const ModelingMachineProvider = ({
                 sketchDetails.origin
               )
             if (err(updatedAst)) return Promise.reject(updatedAst)
+
+            await codeManager.updateEditorWithAstAndWriteToFile(
+              updatedAst.newAst
+            )
+
             const selection = updateSelections(
               pathToNodeMap,
               selectionRanges,
@@ -927,6 +990,11 @@ export const ModelingMachineProvider = ({
                 sketchDetails.origin
               )
             if (err(updatedAst)) return Promise.reject(updatedAst)
+
+            await codeManager.updateEditorWithAstAndWriteToFile(
+              updatedAst.newAst
+            )
+
             const selection = updateSelections(
               pathToNodeMap,
               selectionRanges,
@@ -949,7 +1017,7 @@ export const ModelingMachineProvider = ({
             })
             let parsed = parse(recast(kclManager.ast))
             if (trap(parsed)) return Promise.reject(parsed)
-            parsed = parsed as Program
+            parsed = parsed as Node<Program>
 
             const { modifiedAst: _modifiedAst, pathToReplacedNode } =
               moveValueIntoNewVariablePath(
@@ -960,7 +1028,7 @@ export const ModelingMachineProvider = ({
               )
             parsed = parse(recast(_modifiedAst))
             if (trap(parsed)) return Promise.reject(parsed)
-            parsed = parsed as Program
+            parsed = parsed as Node<Program>
             if (!pathToReplacedNode)
               return Promise.reject(new Error('No path to replaced node'))
 
@@ -973,6 +1041,11 @@ export const ModelingMachineProvider = ({
                 sketchDetails.origin
               )
             if (err(updatedAst)) return Promise.reject(updatedAst)
+
+            await codeManager.updateEditorWithAstAndWriteToFile(
+              updatedAst.newAst
+            )
+
             const selection = updateSelections(
               { 0: pathToReplacedNode },
               selectionRanges,
@@ -995,6 +1068,7 @@ export const ModelingMachineProvider = ({
           ...modelingMachineDefaultContext.store,
           ...persistedContext,
         },
+        machineManager,
       },
       // devTools: true,
     }

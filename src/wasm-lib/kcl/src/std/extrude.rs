@@ -35,16 +35,16 @@ pub async fn extrude(exec_state: &mut ExecState, args: Args) -> Result<KclValue,
 ///   |> startProfileAt([0, 0], %)
 ///   |> line([10, 0], %)
 ///   |> arc({
-///     angleStart: 120,
-///     angleEnd: 0,
-///     radius: 5,
+///     angleStart = 120,
+///     angleEnd = 0,
+///     radius = 5,
 ///   }, %)
 ///   |> line([5, 0], %)
 ///   |> line([0, 10], %)
 ///   |> bezierCurve({
-///     control1: [-10, 0],
-///     control2: [2, 10],
-///     to: [-5, 10],
+///     control1 = [-10, 0],
+///     control2 = [2, 10],
+///     to = [-5, 10],
 ///   }, %)
 ///   |> line([-5, -2], %)
 ///   |> close(%)
@@ -55,16 +55,16 @@ pub async fn extrude(exec_state: &mut ExecState, args: Args) -> Result<KclValue,
 /// const exampleSketch = startSketchOn('XZ')
 ///   |> startProfileAt([-10, 0], %)
 ///   |> arc({
-///     angleStart: 120,
-///     angleEnd: -60,
-///     radius: 5,
+///     angleStart = 120,
+///     angleEnd = -60,
+///     radius = 5,
 ///   }, %)
 ///   |> line([10, 0], %)
 ///   |> line([5, 0], %)
 ///   |> bezierCurve({
-///     control1: [-3, 0],
-///     control2: [2, 10],
-///     to: [-5, 10],
+///     control1 = [-3, 0],
+///     control2 = [2, 10],
+///     to = [-5, 10],
 ///   }, %)
 ///   |> line([-4, 10], %)
 ///   |> line([-5, -2], %)
@@ -141,21 +141,11 @@ pub(crate) async fn do_post_extrude(
     )
     .await?;
 
-    if sketch.value.is_empty() {
+    // The "get extrusion face info" API call requires *any* edge on the sketch being extruded.
+    // So, let's just use the first one.
+    let Some(any_edge_id) = sketch.paths.first().map(|edge| edge.get_base().geo_meta.id) else {
         return Err(KclError::Type(KclErrorDetails {
             message: "Expected a non-empty sketch".to_string(),
-            source_ranges: vec![args.source_range],
-        }));
-    }
-
-    let edge_id = sketch.value.iter().find_map(|segment| match segment {
-        Path::ToPoint { base } | Path::Circle { base, .. } => Some(base.geo_meta.id),
-        _ => None,
-    });
-
-    let Some(edge_id) = edge_id else {
-        return Err(KclError::Type(KclErrorDetails {
-            message: "Expected a Path::ToPoint variant".to_string(),
             source_ranges: vec![args.source_range],
         }));
     };
@@ -171,7 +161,7 @@ pub(crate) async fn do_post_extrude(
         .send_modeling_cmd(
             exec_state.id_generator.next_uuid(),
             ModelingCmd::from(mcmd::Solid3dGetExtrusionFaceInfo {
-                edge_id,
+                edge_id: any_edge_id,
                 object_id: sketch.id,
             }),
         )
@@ -229,18 +219,21 @@ pub(crate) async fn do_post_extrude(
     } = analyze_faces(exec_state, &args, face_infos);
     // Iterate over the sketch.value array and add face_id to GeoMeta
     let new_value = sketch
-        .value
+        .paths
         .iter()
         .flat_map(|path| {
             if let Some(Some(actual_face_id)) = face_id_map.get(&path.get_base().geo_meta.id) {
                 match path {
-                    Path::TangentialArc { .. } | Path::TangentialArcTo { .. } | Path::Circle { .. } => {
+                    Path::Arc { .. }
+                    | Path::TangentialArc { .. }
+                    | Path::TangentialArcTo { .. }
+                    | Path::Circle { .. } => {
                         let extrude_surface = ExtrudeSurface::ExtrudeArc(crate::executor::ExtrudeArc {
                             face_id: *actual_face_id,
                             tag: path.get_base().tag.clone(),
                             geo_meta: GeoMeta {
                                 id: path.get_base().geo_meta.id,
-                                metadata: path.get_base().geo_meta.metadata.clone(),
+                                metadata: path.get_base().geo_meta.metadata,
                             },
                         });
                         Some(extrude_surface)
@@ -251,7 +244,7 @@ pub(crate) async fn do_post_extrude(
                             tag: path.get_base().tag.clone(),
                             geo_meta: GeoMeta {
                                 id: path.get_base().geo_meta.id,
-                                metadata: path.get_base().geo_meta.metadata.clone(),
+                                metadata: path.get_base().geo_meta.metadata,
                             },
                         });
                         Some(extrude_surface)
@@ -266,7 +259,7 @@ pub(crate) async fn do_post_extrude(
                     tag: path.get_base().tag.clone(),
                     geo_meta: GeoMeta {
                         id: path.get_base().geo_meta.id,
-                        metadata: path.get_base().geo_meta.metadata.clone(),
+                        metadata: path.get_base().geo_meta.metadata,
                     },
                 });
                 Some(extrude_surface)
@@ -315,6 +308,10 @@ fn analyze_faces(exec_state: &mut ExecState, args: &Args, face_infos: Vec<Extrus
         match face_info.cap {
             ExtrusionFaceCapType::Bottom => faces.start_cap_id = face_info.face_id,
             ExtrusionFaceCapType::Top => faces.end_cap_id = face_info.face_id,
+            ExtrusionFaceCapType::Both => {
+                faces.end_cap_id = face_info.face_id;
+                faces.start_cap_id = face_info.face_id;
+            }
             ExtrusionFaceCapType::None => {
                 if let Some(curve_id) = face_info.curve_id {
                     faces.sides.insert(curve_id, face_info.face_id);

@@ -1,8 +1,9 @@
 //! Types used to send data to the test server.
 
 use crate::{
-    executor::{ExecutorContext, ExecutorSettings, IdGenerator},
+    executor::{new_zoo_client, ExecutorContext, ExecutorSettings, ProgramMemory},
     settings::types::UnitLength,
+    ConnectionError, ExecError, ExecState, Program,
 };
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -14,63 +15,53 @@ pub struct RequestBody {
 
 /// Executes a kcl program and takes a snapshot of the result.
 /// This returns the bytes of the snapshot.
-pub async fn execute_and_snapshot(code: &str, units: UnitLength) -> anyhow::Result<image::DynamicImage> {
+pub async fn execute_and_snapshot(code: &str, units: UnitLength) -> Result<image::DynamicImage, ExecError> {
     let ctx = new_context(units, true).await?;
-    do_execute_and_snapshot(&ctx, code).await
+    let program = Program::parse(code)?;
+    do_execute_and_snapshot(&ctx, program).await.map(|(_state, snap)| snap)
 }
 
-pub async fn execute_and_snapshot_no_auth(code: &str, units: UnitLength) -> anyhow::Result<image::DynamicImage> {
+/// Executes a kcl program and takes a snapshot of the result.
+/// This returns the bytes of the snapshot.
+pub async fn execute_and_snapshot_ast(
+    ast: Program,
+    units: UnitLength,
+) -> Result<(ProgramMemory, image::DynamicImage), ExecError> {
+    let ctx = new_context(units, true).await?;
+    do_execute_and_snapshot(&ctx, ast)
+        .await
+        .map(|(state, snap)| (state.memory, snap))
+}
+
+pub async fn execute_and_snapshot_no_auth(code: &str, units: UnitLength) -> Result<image::DynamicImage, ExecError> {
     let ctx = new_context(units, false).await?;
-    do_execute_and_snapshot(&ctx, code).await
+    let program = Program::parse(code)?;
+    do_execute_and_snapshot(&ctx, program).await.map(|(_state, snap)| snap)
 }
 
-async fn do_execute_and_snapshot(ctx: &ExecutorContext, code: &str) -> anyhow::Result<image::DynamicImage> {
-    let tokens = crate::token::lexer(code)?;
-    let parser = crate::parser::Parser::new(tokens);
-    let program = parser.ast()?;
+async fn do_execute_and_snapshot(
+    ctx: &ExecutorContext,
+    program: Program,
+) -> Result<(crate::executor::ExecState, image::DynamicImage), ExecError> {
+    let mut exec_state = ExecState::default();
+    let snapshot_png_bytes = ctx.execute_and_prepare(&program, &mut exec_state).await?.contents.0;
 
-    let snapshot = ctx
-        .execute_and_prepare_snapshot(&program, IdGenerator::default(), None)
-        .await?;
-
-    // Create a temporary file to write the output to.
-    let output_file = std::env::temp_dir().join(format!("kcl_output_{}.png", uuid::Uuid::new_v4()));
-    // Save the snapshot locally, to that temporary file.
-    std::fs::write(&output_file, snapshot.contents.0)?;
     // Decode the snapshot, return it.
-    let img = image::ImageReader::open(output_file).unwrap().decode()?;
-    Ok(img)
+    let img = image::ImageReader::new(std::io::Cursor::new(snapshot_png_bytes))
+        .with_guessed_format()
+        .map_err(|e| ExecError::BadPng(e.to_string()))
+        .and_then(|x| x.decode().map_err(|e| ExecError::BadPng(e.to_string())))?;
+    Ok((exec_state, img))
 }
 
-async fn new_context(units: UnitLength, with_auth: bool) -> anyhow::Result<ExecutorContext> {
-    let user_agent = concat!(env!("CARGO_PKG_NAME"), ".rs/", env!("CARGO_PKG_VERSION"),);
-    let http_client = reqwest::Client::builder()
-        .user_agent(user_agent)
-        // For file conversions we need this to be long.
-        .timeout(std::time::Duration::from_secs(600))
-        .connect_timeout(std::time::Duration::from_secs(60));
-    let ws_client = reqwest::Client::builder()
-        .user_agent(user_agent)
-        // For file conversions we need this to be long.
-        .timeout(std::time::Duration::from_secs(600))
-        .connect_timeout(std::time::Duration::from_secs(60))
-        .connection_verbose(true)
-        .tcp_keepalive(std::time::Duration::from_secs(600))
-        .http1_only();
-
-    let token = if with_auth {
-        std::env::var("KITTYCAD_API_TOKEN").expect("KITTYCAD_API_TOKEN not set")
-    } else {
-        "bad_token".to_string()
-    };
-
-    // Create the client.
-    let mut client = kittycad::Client::new_from_reqwest(token, http_client, ws_client);
-    // Set a local engine address if it's set.
-    if let Ok(addr) = std::env::var("LOCAL_ENGINE_ADDR") {
-        if with_auth {
-            client.set_base_url(addr);
-        }
+async fn new_context(units: UnitLength, with_auth: bool) -> Result<ExecutorContext, ConnectionError> {
+    let mut client = new_zoo_client(if with_auth { None } else { Some("bad_token".to_string()) }, None)
+        .map_err(ConnectionError::CouldNotMakeClient)?;
+    if !with_auth {
+        // Use prod, don't override based on env vars.
+        // We do this so even in the engine repo, tests that need to run with
+        // no auth can fail in the same way as they would in prod.
+        client.set_base_url("https://api.zoo.dev".to_string());
     }
 
     let ctx = ExecutorContext::new(
@@ -83,6 +74,7 @@ async fn new_context(units: UnitLength, with_auth: bool) -> anyhow::Result<Execu
             replay: None,
         },
     )
-    .await?;
+    .await
+    .map_err(ConnectionError::Establishing)?;
     Ok(ctx)
 }

@@ -48,8 +48,6 @@ pub type StdFn = fn(
     Args,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<KclValue, KclError>> + Send + '_>>;
 
-pub type FnMap = HashMap<String, StdFn>;
-
 lazy_static! {
     static ref CORE_FNS: Vec<Box<dyn StdLibFn>> = vec![
         Box::new(LegLen),
@@ -57,15 +55,21 @@ lazy_static! {
         Box::new(LegAngY),
         Box::new(crate::std::convert::Int),
         Box::new(crate::std::extrude::Extrude),
+        Box::new(crate::std::segment::SegEnd),
         Box::new(crate::std::segment::SegEndX),
         Box::new(crate::std::segment::SegEndY),
+        Box::new(crate::std::segment::SegStart),
+        Box::new(crate::std::segment::SegStartX),
+        Box::new(crate::std::segment::SegStartY),
         Box::new(crate::std::segment::LastSegX),
         Box::new(crate::std::segment::LastSegY),
         Box::new(crate::std::segment::SegLen),
         Box::new(crate::std::segment::SegAng),
+        Box::new(crate::std::segment::TangentToEnd),
         Box::new(crate::std::segment::AngleToMatchLengthX),
         Box::new(crate::std::segment::AngleToMatchLengthY),
         Box::new(crate::std::shapes::Circle),
+        Box::new(crate::std::shapes::Polygon),
         Box::new(crate::std::sketch::LineTo),
         Box::new(crate::std::sketch::Line),
         Box::new(crate::std::sketch::XLineTo),
@@ -86,6 +90,7 @@ lazy_static! {
         Box::new(crate::std::sketch::ProfileStart),
         Box::new(crate::std::sketch::Close),
         Box::new(crate::std::sketch::Arc),
+        Box::new(crate::std::sketch::ArcTo),
         Box::new(crate::std::sketch::TangentialArc),
         Box::new(crate::std::sketch::TangentialArcTo),
         Box::new(crate::std::sketch::TangentialArcToRelative),
@@ -97,8 +102,10 @@ lazy_static! {
         Box::new(crate::std::patterns::PatternCircular2D),
         Box::new(crate::std::patterns::PatternCircular3D),
         Box::new(crate::std::patterns::PatternTransform),
+        Box::new(crate::std::patterns::PatternTransform2D),
         Box::new(crate::std::array::Reduce),
         Box::new(crate::std::array::Map),
+        Box::new(crate::std::array::Push),
         Box::new(crate::std::chamfer::Chamfer),
         Box::new(crate::std::fillet::Fillet),
         Box::new(crate::std::fillet::GetOppositeEdge),
@@ -123,6 +130,7 @@ lazy_static! {
         Box::new(crate::std::math::Sqrt),
         Box::new(crate::std::math::Abs),
         Box::new(crate::std::math::Rem),
+        Box::new(crate::std::math::Round),
         Box::new(crate::std::math::Floor),
         Box::new(crate::std::math::Ceil),
         Box::new(crate::std::math::Min),
@@ -238,7 +246,7 @@ pub enum FunctionKind {
 pub async fn leg_length(_exec_state: &mut ExecState, args: Args) -> Result<KclValue, KclError> {
     let (hypotenuse, leg) = args.get_hypotenuse_leg()?;
     let result = inner_leg_length(hypotenuse, leg);
-    args.make_user_val_from_f64(result)
+    Ok(KclValue::from_number(result, vec![args.into()]))
 }
 
 /// Compute the length of the given leg.
@@ -258,7 +266,7 @@ fn inner_leg_length(hypotenuse: f64, leg: f64) -> f64 {
 pub async fn leg_angle_x(_exec_state: &mut ExecState, args: Args) -> Result<KclValue, KclError> {
     let (hypotenuse, leg) = args.get_hypotenuse_leg()?;
     let result = inner_leg_angle_x(hypotenuse, leg);
-    args.make_user_val_from_f64(result)
+    Ok(KclValue::from_number(result, vec![args.into()]))
 }
 
 /// Compute the angle of the given leg for x.
@@ -278,7 +286,7 @@ fn inner_leg_angle_x(hypotenuse: f64, leg: f64) -> f64 {
 pub async fn leg_angle_y(_exec_state: &mut ExecState, args: Args) -> Result<KclValue, KclError> {
     let (hypotenuse, leg) = args.get_hypotenuse_leg()?;
     let result = inner_leg_angle_y(hypotenuse, leg);
-    args.make_user_val_from_f64(result)
+    Ok(KclValue::from_number(result, vec![args.into()]))
 }
 
 /// Compute the angle of the given leg for y.
@@ -312,6 +320,6 @@ pub enum Primitive {
 /// A closure used as an argument to a stdlib function.
 pub struct FnAsArg<'a> {
     pub func: Option<&'a crate::executor::MemoryFunction>,
-    pub expr: Box<FunctionExpression>,
+    pub expr: crate::ast::types::BoxNode<FunctionExpression>,
     pub memory: Box<ProgramMemory>,
 }

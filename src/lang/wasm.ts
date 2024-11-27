@@ -3,7 +3,6 @@ import init, {
   recast_wasm,
   execute_wasm,
   kcl_lint,
-  lexer_wasm,
   modify_ast_for_sketch_wasm,
   is_points_ccw,
   get_tangential_arc_to_info,
@@ -24,7 +23,6 @@ import { EngineCommandManager } from './std/engineConnection'
 import { Discovered } from '../wasm-lib/kcl/bindings/Discovered'
 import { KclValue } from '../wasm-lib/kcl/bindings/KclValue'
 import type { Program } from '../wasm-lib/kcl/bindings/Program'
-import type { Token } from '../wasm-lib/kcl/bindings/Token'
 import { Coords2d } from './std/sketch'
 import { fileSystemManager } from 'lang/std/fileSystemManager'
 import { CoreDumpInfo } from 'wasm-lib/kcl/bindings/CoreDumpInfo'
@@ -32,7 +30,7 @@ import { CoreDumpManager } from 'lib/coredump'
 import openWindow from 'lib/openWindow'
 import { DefaultPlanes } from 'wasm-lib/kcl/bindings/DefaultPlanes'
 import { TEST } from 'env'
-import { err } from 'lib/trap'
+import { err, Reason } from 'lib/trap'
 import { Configuration } from 'wasm-lib/kcl/bindings/Configuration'
 import { DeepPartial } from 'lib/types'
 import { ProjectConfiguration } from 'wasm-lib/kcl/bindings/ProjectConfiguration'
@@ -42,6 +40,7 @@ import { ExecState as RawExecState } from '../wasm-lib/kcl/bindings/ExecState'
 import { ProgramMemory as RawProgramMemory } from '../wasm-lib/kcl/bindings/ProgramMemory'
 import { EnvironmentRef } from '../wasm-lib/kcl/bindings/EnvironmentRef'
 import { Environment } from '../wasm-lib/kcl/bindings/Environment'
+import { Node } from 'wasm-lib/kcl/bindings/Node'
 
 export type { Program } from '../wasm-lib/kcl/bindings/Program'
 export type { Expr } from '../wasm-lib/kcl/bindings/Expr'
@@ -61,6 +60,7 @@ export type { CallExpression } from '../wasm-lib/kcl/bindings/CallExpression'
 export type { VariableDeclarator } from '../wasm-lib/kcl/bindings/VariableDeclarator'
 export type { BinaryPart } from '../wasm-lib/kcl/bindings/BinaryPart'
 export type { Literal } from '../wasm-lib/kcl/bindings/Literal'
+export type { LiteralValue } from '../wasm-lib/kcl/bindings/LiteralValue'
 export type { ArrayExpression } from '../wasm-lib/kcl/bindings/ArrayExpression'
 
 export type SyntaxType =
@@ -80,6 +80,7 @@ export type SyntaxType =
   | 'PipeExpression'
   | 'PipeSubstitution'
   | 'Literal'
+  | 'LiteralValue'
   | 'NonCodeNode'
   | 'UnaryExpression'
 
@@ -119,14 +120,14 @@ const initialise = async () => {
 
 export const initPromise = initialise()
 
-export const rangeTypeFix = (ranges: number[][]): [number, number][] =>
-  ranges.map(([start, end]) => [start, end])
+export const rangeTypeFix = (ranges: number[][]): [number, number, number][] =>
+  ranges.map(([start, end, moduleId]) => [start, end, moduleId])
 
-export const parse = (code: string | Error): Program | Error => {
+export const parse = (code: string | Error): Node<Program> | Error => {
   if (err(code)) return code
 
   try {
-    const program: Program = parse_wasm(code)
+    const program: Node<Program> = parse_wasm(code)
     return program
   } catch (e: any) {
     // throw e
@@ -140,6 +141,12 @@ export const parse = (code: string | Error): Program | Error => {
 }
 
 export type PathToNode = [string | number, string][]
+
+export const isPathToNodeNumber = (
+  pathToNode: string | number
+): pathToNode is number => {
+  return typeof pathToNode === 'number'
+}
 
 export interface ExecState {
   memory: ProgramMemory
@@ -335,7 +342,7 @@ export class ProgramMemory {
    */
   hasSketchOrSolid(): boolean {
     for (const node of this.visibleEntries().values()) {
-      if (node.type === 'Solid' || node.value?.type === 'Sketch') {
+      if (node.type === 'Solid' || node.type === 'Sketch') {
         return true
       }
     }
@@ -356,10 +363,10 @@ export class ProgramMemory {
 }
 
 // TODO: In the future, make the parameter be a KclValue.
-export function sketchFromKclValue(
+export function sketchFromKclValueOptional(
   obj: any,
   varName: string | null
-): Sketch | Error {
+): Sketch | Reason {
   if (obj?.value?.type === 'Sketch') return obj.value
   if (obj?.value?.type === 'Solid') return obj.value.sketch
   if (obj?.type === 'Solid') return obj.sketch
@@ -368,17 +375,28 @@ export function sketchFromKclValue(
   }
   const actualType = obj?.value?.type ?? obj?.type
   if (actualType) {
-    console.log(obj)
-    return new Error(
+    return new Reason(
       `Expected ${varName} to be a sketch or solid, but it was ${actualType} instead.`
     )
   } else {
-    return new Error(`Expected ${varName} to be a sketch, but it wasn't.`)
+    return new Reason(`Expected ${varName} to be a sketch, but it wasn't.`)
   }
 }
 
+// TODO: In the future, make the parameter be a KclValue.
+export function sketchFromKclValue(
+  obj: any,
+  varName: string | null
+): Sketch | Error {
+  const result = sketchFromKclValueOptional(obj, varName)
+  if (result instanceof Reason) {
+    return result.toError()
+  }
+  return result
+}
+
 export const executor = async (
-  node: Program,
+  node: Node<Program>,
   programMemory: ProgramMemory | Error = ProgramMemory.empty(),
   idGenerator: IdGenerator = defaultIdGenerator(),
   engineCommandManager: EngineCommandManager,
@@ -402,7 +420,7 @@ export const executor = async (
 }
 
 export const _executor = async (
-  node: Program,
+  node: Node<Program>,
   programMemory: ProgramMemory | Error = ProgramMemory.empty(),
   idGenerator: IdGenerator = defaultIdGenerator(),
   engineCommandManager: EngineCommandManager,
@@ -487,19 +505,15 @@ export const modifyGrid = async (
   }
 }
 
-export function lexer(str: string): Token[] | Error {
-  return lexer_wasm(str)
-}
-
 export const modifyAstForSketch = async (
   engineCommandManager: EngineCommandManager,
-  ast: Program,
+  ast: Node<Program>,
   variableName: string,
   currentPlane: string,
   engineId: string
-): Promise<Program> => {
+): Promise<Node<Program>> => {
   try {
-    const updatedAst: Program = await modify_ast_for_sketch_wasm(
+    const updatedAst: Node<Program> = await modify_ast_for_sketch_wasm(
       engineCommandManager,
       JSON.stringify(ast),
       variableName,

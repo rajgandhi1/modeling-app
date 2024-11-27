@@ -16,7 +16,7 @@ gloo-utils = "0.2.0"
 kcl-lib = { path = "kcl" }
 kittycad.workspace = true
 serde_json = "1.0.128"
-tokio = { version = "1.40.0", features = ["sync"] }
+tokio = { version = "1.41.1", features = ["sync"] }
 toml = "0.8.19"
 uuid = { version = "1.11.0", features = ["v4", "js", "serde"] }
 wasm-bindgen = "0.2.91"
@@ -24,12 +24,12 @@ wasm-bindgen-futures = "0.4.44"
 
 [dev-dependencies]
 anyhow = "1"
-image = { version = "0.25.3", default-features = false, features = ["png"] }
+image = { version = "0.25.5", default-features = false, features = ["png"] }
 kittycad = { workspace = true, default-features = true }
 kittycad-modeling-cmds = { workspace = true }
 pretty_assertions = "1.4.1"
 reqwest = { version = "0.12", default-features = false }
-tokio = { version = "1.40.0", features = ["rt-multi-thread", "macros", "time"] }
+tokio = { version = "1.41.1", features = ["rt-multi-thread", "macros", "time"] }
 twenty-twenty = "0.8"
 uuid = { version = "1.11.0", features = ["v4", "js", "serde"] }
 
@@ -57,6 +57,10 @@ debug = true
 [profile.dev]
 debug = 0
 
+[profile.dev.package]
+insta.opt-level = 3
+similar.opt-level = 3
+
 [profile.test]
 debug = "line-tables-only"
 
@@ -64,15 +68,14 @@ debug = "line-tables-only"
 members = [
 	"derive-docs",
 	"kcl",
-	"kcl-macros",
 	"kcl-test-server",
 	"kcl-to-core",
 ]
 
 [workspace.dependencies]
 http = "1"
-kittycad = { version = "0.3.23", default-features = false, features = ["js", "requests"] }
-kittycad-modeling-cmds = { version = "0.2.68", features = ["websocket"] }
+kittycad = { version = "0.3.25", default-features = false, features = ["js", "requests"] }
+kittycad-modeling-cmds = { version = "0.2.76", features = ["websocket"] }
 
 [[test]]
 name = "executor"
@@ -83,6 +86,6 @@ name = "modify"
 path = "tests/modify/main.rs"
 
 # Example: how to point modeling-api at a different repo (e.g. a branch or a local clone)
-#[patch."https://github.com/KittyCAD/modeling-api"]
+#[patch.crates-io]
 #kittycad-modeling-cmds = { path = "../../../modeling-api/modeling-cmds" }
 #kittycad-modeling-session = { path = "../../../modeling-api/modeling-session" }

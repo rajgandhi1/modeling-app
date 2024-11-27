@@ -9,24 +9,27 @@ use kittycad_modeling_cmds as kcmc;
 use crate::{
     ast::types::{
         ArrayExpression, CallExpression, ConstraintLevel, FormatOptions, Literal, PipeExpression, PipeSubstitution,
-        Program, VariableDeclarator,
+        VariableDeclarator,
     },
     engine::EngineManager,
     errors::{KclError, KclErrorDetails},
     executor::{Point2d, SourceRange},
+    Program,
 };
+
+use super::types::{ModuleId, Node};
 
 type Point3d = kcmc::shared::Point3d<f64>;
 
 #[derive(Debug)]
 /// The control point data for a curve or line.
-pub struct ControlPointData {
+struct ControlPointData {
     /// The control points for the curve or line.
-    pub points: Vec<Point3d>,
+    points: Vec<Point3d>,
     /// The command that created this curve or line.
-    pub command: PathCommand,
+    _command: PathCommand,
     /// The id of the curve or line.
-    pub id: uuid::Uuid,
+    _id: uuid::Uuid,
 }
 
 const EPSILON: f64 = 0.015625; // or 2^-6
@@ -36,6 +39,7 @@ const EPSILON: f64 = 0.015625; // or 2^-6
 pub async fn modify_ast_for_sketch(
     engine: &Arc<Box<dyn EngineManager>>,
     program: &mut Program,
+    module_id: ModuleId,
     // The name of the sketch.
     sketch_name: &str,
     // The type of plane the sketch is on. `XY` or `XZ`, etc
@@ -47,7 +51,7 @@ pub async fn modify_ast_for_sketch(
     // If it is, we cannot modify it.
 
     // Get the information about the sketch.
-    if let Some(ast_sketch) = program.get_variable(sketch_name) {
+    if let Some(ast_sketch) = program.ast.get_variable(sketch_name) {
         let constraint_level = match ast_sketch {
             super::types::Definition::Variable(var) => var.get_constraint_level(),
             super::types::Definition::Import(import) => import.get_constraint_level(),
@@ -127,8 +131,8 @@ pub async fn modify_ast_for_sketch(
 
             control_points.push(ControlPointData {
                 points: data.control_points.clone(),
-                command: segment.command,
-                id: (*command_id).into(),
+                _command: segment.command,
+                _id: (*command_id).into(),
             });
         }
     }
@@ -176,14 +180,14 @@ pub async fn modify_ast_for_sketch(
     )?;
 
     // Add the sketch back to the program.
-    program.replace_variable(sketch_name, sketch);
+    program.ast.replace_variable(sketch_name, sketch);
 
-    let recasted = program.recast(&FormatOptions::default(), 0);
+    let recasted = program.ast.recast(&FormatOptions::default(), 0);
 
     // Re-parse the ast so we get the correct source ranges.
-    let tokens = crate::token::lexer(&recasted)?;
-    let parser = crate::parser::Parser::new(tokens);
-    *program = parser.ast()?;
+    *program = crate::parser::parse_str(&recasted, module_id)
+        .parse_errs_as_err()?
+        .into();
 
     Ok(recasted)
 }
@@ -195,7 +199,7 @@ fn create_start_sketch_on(
     end: [f64; 2],
     plane: crate::executor::PlaneType,
     additional_lines: Vec<[f64; 2]>,
-) -> Result<VariableDeclarator, KclError> {
+) -> Result<Node<VariableDeclarator>, KclError> {
     let start_sketch_on = CallExpression::new("startSketchOn", vec![Literal::new(plane.to_string().into()).into()])?;
     let start_profile_at = CallExpression::new(
         "startProfileAt",

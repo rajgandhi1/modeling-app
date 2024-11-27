@@ -4,7 +4,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import fsSync from 'node:fs'
 import packageJson from '../package.json'
-import { MachinesListing } from 'lib/machineManager'
+import { MachinesListing } from 'components/MachineManagerProvider'
 import chokidar from 'chokidar'
 
 const open = (args: any) => ipcRenderer.invoke('dialog.showOpenDialog', args)
@@ -117,6 +117,10 @@ const listMachines = async (
 const getMachineApiIp = async (): Promise<String | null> =>
   ipcRenderer.invoke('find_machine_api')
 
+const getArgvParsed = () => {
+  return ipcRenderer.invoke('argv.parser')
+}
+
 contextBridge.exposeInMainWorld('electron', {
   startDeviceFlow,
   loginWithDeviceFlow,
@@ -184,4 +188,5 @@ contextBridge.exposeInMainWorld('electron', {
   onUpdateDownloaded,
   onUpdateError,
   appRestart,
+  getArgvParsed,
 })
