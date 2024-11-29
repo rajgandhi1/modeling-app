@@ -56,7 +56,6 @@ test(
     })
 
     await expect(projectLinks).toHaveCount(0)
-
   }
 )
 
@@ -64,7 +63,6 @@ test(
   'click help/keybindings from home page',
   { tag: '@electron' },
   async ({ page }, testInfo) => {
-
     await page.setBodyDimensions({ width: 1200, height: 500 })
 
     page.on('console', console.log)
@@ -76,7 +74,6 @@ test(
     await page.getByTestId('keybindings-button').click()
     // Make sure the keyboard shortcuts modal is visible.
     await expect(page.getByText('Enter Sketch Mode')).toBeVisible()
-
   }
 )
 
@@ -114,7 +111,6 @@ test(
     await page.getByTestId('keybindings-button').click()
     // Make sure the keyboard shortcuts modal is visible.
     await expect(page.getByText('Enter Sketch Mode')).toBeVisible()
-
   }
 )
 
@@ -148,7 +144,6 @@ test(
     await page.hover('.cm-lint-marker-error')
     const crypticErrorText = `Expected a tag declarator`
     await expect(page.getByText(crypticErrorText).first()).toBeVisible()
-
   }
 )
 
@@ -240,7 +235,6 @@ test.describe('Can export from electron app', () => {
           // clean up exported file
           await fsp.rm(filepath)
         })
-
       }
     )
   }
@@ -248,7 +242,7 @@ test.describe('Can export from electron app', () => {
 test(
   'Rename and delete projects, also spam arrow keys when renaming',
   { tag: '@electron' },
-  async ({ context, page}, testInfo) => {
+  async ({ context, page }, testInfo) => {
     await context.folderSetupFn(async (dir) => {
       await fsp.mkdir(`${dir}/router-template-slate`, { recursive: true })
       await fsp.copyFile(
@@ -441,7 +435,6 @@ test(
       // expect the name not to have changed
       await expect(page.getByText('bracket')).toBeVisible()
     })
-
   }
 )
 
@@ -470,7 +463,6 @@ test(
     // expect to still be on the home page
     await expect(page.getByText('router-template-slate')).toBeVisible()
     await expect(page.getByText('Your Projects')).toBeVisible()
-
   }
 )
 
@@ -533,7 +525,6 @@ test.describe(`Project management commands`, () => {
         await expect(projectHomeLink.first()).toBeVisible()
         await expect(projectHomeLink.first()).toContainText(projectRenamedName)
       })
-
     }
   )
 
@@ -586,7 +577,6 @@ test.describe(`Project management commands`, () => {
       await test.step(`Check the project was deleted and we navigated home`, async () => {
         await expect(noProjectsMessage).toBeVisible()
       })
-
     }
   )
   test(
@@ -642,7 +632,6 @@ test.describe(`Project management commands`, () => {
         ).toBeVisible()
         await expect(projectHomeLink).not.toHaveText(projectName)
       })
-
     }
   )
   test(
@@ -692,7 +681,6 @@ test.describe(`Project management commands`, () => {
         await expect(projectHomeLink).not.toBeVisible()
         await expect(noProjectsMessage).toBeVisible()
       })
-
     }
   )
 })
@@ -738,7 +726,6 @@ test(
     await expect(u.codeLocator).toContainText(
       'A mounting bracket for the Focusrite Scarlett Solo audio interface'
     )
-
   }
 )
 
@@ -794,10 +781,11 @@ test(
       ).rejects.toThrow()
       // eslint-disable-next-line jest/no-conditional-expect
       await expect(
-        fsp.access(path.join(testDir, 'router-template-slate', 'nested', 'main.kcl'))
+        fsp.access(
+          path.join(testDir, 'router-template-slate', 'nested', 'main.kcl')
+        )
       ).rejects.toThrow()
     }
-
   }
 )
 
@@ -876,7 +864,6 @@ test.fixme(
         page.getByTestId('project-link').filter({ hasText: 'project-000' })
       ).toBeVisible()
     })
-
   }
 )
 
@@ -914,7 +901,6 @@ test(
     await expect(u.codeLocator).toContainText('routerDiameter')
     await expect(u.codeLocator).toContainText('templateGap')
     await expect(u.codeLocator).toContainText('minClampingDistance')
-
   }
 )
 
@@ -1022,7 +1008,6 @@ test(
         )
       }
     })
-
   }
 )
 
@@ -1211,7 +1196,6 @@ test(
       await expect(page.getByText('router-template-slate')).toBeVisible()
       await expect(page.getByText('New Project')).toBeVisible()
     })
-
   }
 )
 
@@ -1271,9 +1255,9 @@ test(
       await page.getByTestId('project-directory-button').click()
       await handleFile
 
-      await expect.poll(() => page.locator('section#projectDirectory input').inputValue()).toContain(
-        newProjectDirName
-      )
+      await expect
+        .poll(() => page.locator('section#projectDirectory input').inputValue())
+        .toContain(newProjectDirName)
 
       await page.getByTestId('settings-close-button').click()
 
@@ -1290,7 +1274,6 @@ test(
       ).toBeVisible()
 
       await page.getByTestId('project-directory-settings-link').click()
-
 
       const handleFile = electronApp.evaluate(
         async ({ dialog }, filePaths) => {
@@ -1369,7 +1352,6 @@ test(
         await expect(page.getByText(name)).toBeVisible()
       }
     })
-
   }
 )
 
@@ -1475,7 +1457,6 @@ test(
         false
       )
     })
-
   }
 )
 
@@ -1534,7 +1515,6 @@ test(
       expect(selectedText.length).toBe(0)
       await expect(u.codeLocator).toHaveText('')
     })
-
   }
 )
 
@@ -1554,7 +1534,6 @@ test(
       await expect(page.getByTestId('app-theme')).toHaveValue('dark')
 
       await page.getByTestId('app-theme').selectOption('light')
-
     })
 
     await test.step('Starting the app again and we can see the same theme', async () => {
@@ -1563,7 +1542,6 @@ test(
 
       page.on('console', console.log)
       await expect(page.getByTestId('app-theme')).toHaveValue('light')
-
     })
   }
 )
@@ -1605,6 +1583,5 @@ test.fixme(
         await expect(projectLink).toContainText(projectNames[index])
       }
     })
-
   }
 )
