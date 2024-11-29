@@ -13,7 +13,7 @@ import {
   getPathToExtrudeForSegmentSelection,
   hasValidFilletSelection,
   isTagUsedInFillet,
-  modifyAstCloneWithFilletAndTag,
+  modifyAstWithFilletAndTag,
 } from './addFillet'
 import { getNodeFromPath, getNodePathFromSourceRange } from '../queryAst'
 import { createLiteral } from 'lang/modifyAst'
@@ -22,6 +22,8 @@ import { Selections } from 'lib/selections'
 import { engineCommandManager, kclManager } from 'lib/singletons'
 import { VITE_KC_DEV_TOKEN } from 'env'
 import { KclCommandValue } from 'lib/commandTypes'
+import { isOverlap } from 'lib/utils'
+import { codeRefFromRange } from 'lang/std/artifactGraph'
 
 beforeAll(async () => {
   await initPromise
@@ -114,10 +116,9 @@ const runGetPathToExtrudeForSegmentSelectionTest = async (
     code.indexOf(selectedSegmentSnippet) + selectedSegmentSnippet.length,
   ]
   const selection: Selections = {
-    codeBasedSelections: [
+    graphSelections: [
       {
-        range: segmentRange,
-        type: 'default',
+        codeRef: codeRefFromRange(segmentRange, ast),
       },
     ],
     otherSelections: [],
@@ -272,13 +273,6 @@ const runModifyAstCloneWithFilletAndTag = async (
       code.indexOf(selectionSnippet) + selectionSnippet.length,
     ]
   )
-  const selection: Selections = {
-    codeBasedSelections: segmentRanges.map((segmentRange) => ({
-      range: segmentRange,
-      type: 'default',
-    })),
-    otherSelections: [],
-  }
 
   // radius
   const radius: KclCommandValue = {
@@ -289,9 +283,24 @@ const runModifyAstCloneWithFilletAndTag = async (
 
   // executeAst
   await kclManager.executeAst({ ast })
+  const artifactGraph = engineCommandManager.artifactGraph
+
+  const selection: Selections = {
+    graphSelections: segmentRanges.map((segmentRange) => {
+      const maybeArtifact = [...artifactGraph].find(([, a]) => {
+        if (!('codeRef' in a)) return false
+        return isOverlap(a.codeRef.range, segmentRange)
+      })
+      return {
+        codeRef: codeRefFromRange(segmentRange, ast),
+        artifact: maybeArtifact ? maybeArtifact[1] : undefined,
+      }
+    }),
+    otherSelections: [],
+  }
 
   // apply fillet to selection
-  const result = modifyAstCloneWithFilletAndTag(ast, selection, radius)
+  const result = modifyAstWithFilletAndTag(ast, selection, radius)
   if (err(result)) {
     return result
   }
@@ -321,7 +330,7 @@ extrude001 = extrude(-15, sketch001)`
   |> lineTo([profileStartX(%), profileStartY(%)], %)
   |> close(%)
 extrude001 = extrude(-15, sketch001)
-  |> fillet({ radius: 3, tags: [seg01] }, %)`
+  |> fillet({ radius = 3, tags = [seg01] }, %)`
 
     await runModifyAstCloneWithFilletAndTag(
       code,
@@ -349,7 +358,7 @@ extrude001 = extrude(-15, sketch001)
   |> lineTo([profileStartX(%), profileStartY(%)], %)
   |> close(%)
   |> extrude(-15, %)
-  |> fillet({ radius: 3, tags: [seg01] }, %)`
+  |> fillet({ radius = 3, tags = [seg01] }, %)`
 
     await runModifyAstCloneWithFilletAndTag(
       code,
@@ -377,7 +386,7 @@ extrude001 = extrude(-15, sketch001)`
   |> lineTo([profileStartX(%), profileStartY(%)], %)
   |> close(%)
 extrude001 = extrude(-15, sketch001)
-  |> fillet({ radius: 3, tags: [seg01] }, %)`
+  |> fillet({ radius = 3, tags = [seg01] }, %)`
 
     await runModifyAstCloneWithFilletAndTag(
       code,
@@ -405,7 +414,7 @@ extrude001 = extrude(-15, sketch001)`
   |> lineTo([profileStartX(%), profileStartY(%)], %)
   |> close(%)
 extrude001 = extrude(-15, sketch001)
-  |> fillet({ radius: 3, tags: [seg02] }, %)`
+  |> fillet({ radius = 3, tags = [seg02] }, %)`
 
     await runModifyAstCloneWithFilletAndTag(
       code,
@@ -423,7 +432,7 @@ extrude001 = extrude(-15, sketch001)
   |> lineTo([profileStartX(%), profileStartY(%)], %)
   |> close(%)
 extrude001 = extrude(-15, sketch001)
-  |> fillet({ radius: 5, tags: [seg01] }, %)`
+  |> fillet({ radius = 5, tags = [seg01] }, %)`
     const segmentSnippets = ['line([-20, 0], %)']
     const radiusValue = 3
     const expectedCode = `sketch001 = startSketchOn('XY')
@@ -434,8 +443,8 @@ extrude001 = extrude(-15, sketch001)
   |> lineTo([profileStartX(%), profileStartY(%)], %)
   |> close(%)
 extrude001 = extrude(-15, sketch001)
-  |> fillet({ radius: 5, tags: [seg01] }, %)
-  |> fillet({ radius: 3, tags: [seg02] }, %)`
+  |> fillet({ radius = 5, tags = [seg01] }, %)
+  |> fillet({ radius = 3, tags = [seg02] }, %)`
 
     await runModifyAstCloneWithFilletAndTag(
       code,
@@ -463,7 +472,7 @@ extrude001 = extrude(-15, sketch001)`
   |> lineTo([profileStartX(%), profileStartY(%)], %)
   |> close(%)
 extrude001 = extrude(-15, sketch001)
-  |> fillet({ radius: 3, tags: [seg01, seg02] }, %)`
+  |> fillet({ radius = 3, tags = [seg01, seg02] }, %)`
 
     await runModifyAstCloneWithFilletAndTag(
       code,
@@ -503,7 +512,7 @@ extrude002 = extrude(-25, sketch002)` // <--- body 2
   |> lineTo([profileStartX(%), profileStartY(%)], %)
   |> close(%)
 extrude001 = extrude(-15, sketch001)
-  |> fillet({ radius: 3, tags: [seg01, seg02] }, %)
+  |> fillet({ radius = 3, tags = [seg01, seg02] }, %)
 sketch002 = startSketchOn('XY')
   |> startProfileAt([30, 10], %)
   |> line([15, 0], %)
@@ -512,7 +521,7 @@ sketch002 = startSketchOn('XY')
   |> lineTo([profileStartX(%), profileStartY(%)], %)
   |> close(%)
 extrude002 = extrude(-25, sketch002)
-  |> fillet({ radius: 3, tags: [seg03] }, %)` // <-- able to add a new one
+  |> fillet({ radius = 3, tags = [seg03] }, %)` // <-- able to add a new one
 
     await runModifyAstCloneWithFilletAndTag(
       code,
@@ -532,8 +541,8 @@ describe('Testing isTagUsedInFillet', () => {
   |> close(%)
 extrude001 = extrude(-5, sketch001)
   |> fillet({
-       radius: 1.11,
-       tags: [
+       radius = 1.11,
+       tags = [
          getOppositeEdge(seg01),
          seg01,
          getPreviousAdjacentEdge(seg02)
@@ -612,7 +621,6 @@ describe('Testing button states', () => {
     }
     const ast = astOrError
 
-    // selectionRanges
     const range: [number, number] = segmentSnippet
       ? [
           code.indexOf(segmentSnippet),
@@ -621,10 +629,9 @@ describe('Testing button states', () => {
       : [ast.end, ast.end] // empty line in the end of the code
 
     const selectionRanges: Selections = {
-      codeBasedSelections: [
+      graphSelections: [
         {
-          range,
-          type: 'default',
+          codeRef: codeRefFromRange(range, ast),
         },
       ],
       otherSelections: [],
