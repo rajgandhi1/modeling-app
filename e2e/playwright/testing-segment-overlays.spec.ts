@@ -16,7 +16,7 @@ test.describe('Testing segment overlays', () => {
      * @param {number} options.steps - The number of steps to perform
      */
     const _clickConstrained =
-      (page: Page) =>
+      (page: Page, editor: EditorFixture) =>
       async ({
         hoverPos,
         constraintType,
@@ -50,10 +50,9 @@ test.describe('Testing segment overlays', () => {
         y = hoverPos.y - Math.sin(ang * deg) * 32
         await page.mouse.move(x, y)
         await wiggleMove(page, x, y, 20, 30, ang, 10, 5, locator)
+        await page.mouse.move(x, y)
 
-        await expect(page.locator('.cm-content')).toContainText(
-          expectBeforeUnconstrained
-        )
+        await editor.expectEditor.toContain(expectBeforeUnconstrained, { shouldNormalise: true })
         const constrainedLocator = page.locator(
           `[data-constraint-type="${constraintType}"][data-is-constrained="true"]`
         )
@@ -63,9 +62,7 @@ test.describe('Testing segment overlays', () => {
           await page.getByTestId('constraint-symbol-popover').count()
         ).toBeGreaterThan(0)
         await constrainedLocator.click()
-        await expect(page.locator('.cm-content')).toContainText(
-          expectAfterUnconstrained
-        )
+        await editor.expectEditor.toContain(expectAfterUnconstrained, { shouldNormalise: true })
 
         await page.mouse.move(0, 0)
         await page.waitForTimeout(1000)
@@ -73,6 +70,7 @@ test.describe('Testing segment overlays', () => {
         y = hoverPos.y - Math.sin(ang * deg) * 32
         await page.mouse.move(x, y)
         await wiggleMove(page, x, y, 20, 30, ang, 10, 5, locator)
+        await page.mouse.move(x, y)
 
         const unconstrainedLocator = page.locator(
           `[data-constraint-type="${constraintType}"][data-is-constrained="false"]`
@@ -84,7 +82,7 @@ test.describe('Testing segment overlays', () => {
         ).toBeGreaterThan(0)
         await unconstrainedLocator.click()
         await page.getByText('Add variable').click()
-        await expect(page.locator('.cm-content')).toContainText(expectFinal)
+        await editor.expectEditor.toContain(expectFinal, { shouldNormalise: true })
       }
 
     /**
@@ -97,7 +95,7 @@ test.describe('Testing segment overlays', () => {
      * @param {number} options.steps - The number of steps to perform
      */
     const _clickUnconstrained =
-      (page: Page) =>
+      (page: Page, editor: EditorFixture) =>
       async ({
         hoverPos,
         constraintType,
@@ -129,11 +127,10 @@ test.describe('Testing segment overlays', () => {
         y = hoverPos.y - Math.sin(ang * deg) * 32
         await page.mouse.move(x, y)
         await wiggleMove(page, x, y, 20, 30, ang, 10, 5, locator)
+        await page.mouse.move(x, y)
 
         await expect(page.getByText('Added variable')).not.toBeVisible()
-        await expect(page.locator('.cm-content')).toContainText(
-          expectBeforeUnconstrained
-        )
+        await editor.expectEditor.toContain(expectBeforeUnconstrained, { shouldNormalise: true })
         const unconstrainedLocator = page.locator(
           `[data-constraint-type="${constraintType}"][data-is-constrained="false"]`
         )
@@ -144,9 +141,7 @@ test.describe('Testing segment overlays', () => {
         ).toBeGreaterThan(0)
         await unconstrainedLocator.click()
         await page.getByText('Add variable').click()
-        await expect(page.locator('.cm-content')).toContainText(
-          expectAfterUnconstrained
-        )
+        await editor.expectEditor.toContain(expectAfterUnconstrained, { shouldNormalise: true })
         await expect(page.getByText('Added variable')).not.toBeVisible()
 
         await page.mouse.move(0, 0)
@@ -155,6 +150,7 @@ test.describe('Testing segment overlays', () => {
         y = hoverPos.y - Math.sin(ang * deg) * 32
         await page.mouse.move(x, y)
         await wiggleMove(page, x, y, 20, 30, ang, 10, 5, locator)
+        await page.mouse.move(x, y)
 
         const constrainedLocator = page.locator(
           `[data-constraint-type="${constraintType}"][data-is-constrained="true"]`
@@ -165,11 +161,12 @@ test.describe('Testing segment overlays', () => {
           await page.getByTestId('constraint-symbol-popover').count()
         ).toBeGreaterThan(0)
         await constrainedLocator.click()
-        await expect(page.locator('.cm-content')).toContainText(expectFinal)
+        await editor.expectEditor.toContain(expectFinal, { shouldNormalise: true })
       }
     test.setTimeout(120000)
     test('for segments [line, angledLine, lineTo, xLineTo]', async ({
       page,
+      editor,
       homePage,
     }) => {
       await page.addInitScript(async () => {
@@ -178,20 +175,20 @@ test.describe('Testing segment overlays', () => {
           `part001 = startSketchOn('XZ')
         |> startProfileAt([5 + 0, 20 + 0], %)
         |> line([0.5, -14 + 0], %)
-        |> angledLine({ angle: 3 + 0, length: 32 + 0 }, %)
+        |> angledLine({ angle = 3 + 0, length = 32 + 0 }, %)
         |> lineTo([5 + 33, 20 + 11.5 + 0], %)
         |> xLineTo(5 + 9 - 5, %)
         |> yLineTo(20 + -10.77, %, $a)
         |> xLine(26.04, %)
         |> yLine(21.14 + 0, %)
-        |> angledLineOfXLength({ angle: 181 + 0, length: 23.14 }, %)
-        |> angledLineOfYLength({ angle: -91, length: 19 + 0 }, %)
-        |> angledLineToX({ angle: 3 + 0, to: 5 + 26 }, %)
-        |> angledLineToY({ angle: 89, to: 20 + 9.14 + 0 }, %)
+        |> angledLineOfXLength({ angle = 181 + 0, length = 23.14 }, %)
+        |> angledLineOfYLength({ angle = -91, length = 19 + 0 }, %)
+        |> angledLineToX({ angle = 3 + 0, to = 5 + 26 }, %)
+        |> angledLineToY({ angle = 89, to = 20 + 9.14 + 0 }, %)
         |> angledLineThatIntersects({
-        angle: 4.14,
-        intersectTag: a,
-        offset: 9
+        angle = 4.14,
+        intersectTag = a,
+        offset = 9
       }, %)
         |> tangentialArcTo([5 + 3.14 + 13, 20 + 3.14], %)
       `
@@ -214,8 +211,8 @@ test.describe('Testing segment overlays', () => {
 
       await expect(page.getByTestId('segment-overlay')).toHaveCount(13)
 
-      const clickUnconstrained = _clickUnconstrained(page)
-      const clickConstrained = _clickConstrained(page)
+      const clickUnconstrained = _clickUnconstrained(page, editor)
+      const clickConstrained = _clickConstrained(page, editor)
 
       await u.openAndClearDebugPanel()
       await u.sendCustomCmd({
@@ -333,7 +330,7 @@ test.describe('Testing segment overlays', () => {
         locator: '[data-overlay-toolbar-index="3"]',
       })
     })
-    test('for segments [yLineTo, xLine]', async ({ page, homePage }) => {
+    test('for segments [yLineTo, xLine]', async ({ page, editor, homePage }) => {
       await page.addInitScript(async () => {
         localStorage.setItem(
           'persistCode',
@@ -347,13 +344,13 @@ test.describe('Testing segment overlays', () => {
     part001 = startSketchOn('XZ')
       |> startProfileAt([0, 0], %)
       |> line([0.5, yRel001], %)
-      |> angledLine({ angle: angle001, length: len001 }, %)
+      |> angledLine({ angle = angle001, length = len001 }, %)
       |> lineTo([33, yAbs001], %)
       |> xLineTo(xAbs002, %)
       |> yLineTo(-10.77, %, $a)
       |> xLine(26.04, %)
       |> yLine(21.14 + 0, %)
-      |> angledLineOfXLength({ angle: 181 + 0, length: 23.14 }, %)
+      |> angledLineOfXLength({ angle = 181 + 0, length = 23.14 }, %)
       `
         )
       })
@@ -374,7 +371,7 @@ test.describe('Testing segment overlays', () => {
 
       await expect(page.getByTestId('segment-overlay')).toHaveCount(8)
 
-      const clickUnconstrained = _clickUnconstrained(page)
+      const clickUnconstrained = _clickUnconstrained(page, editor)
 
       await page.mouse.move(700, 250)
       await page.waitForTimeout(100)
@@ -410,6 +407,7 @@ test.describe('Testing segment overlays', () => {
     })
     test('for segments [yLine, angledLineOfXLength, angledLineOfYLength]', async ({
       page,
+      editor,
       homePage,
     }) => {
       await page.addInitScript(async () => {
@@ -418,20 +416,20 @@ test.describe('Testing segment overlays', () => {
           `part001 = startSketchOn('XZ')
         |> startProfileAt([0, 0], %)
         |> line([0.5, -14 + 0], %)
-        |> angledLine({ angle: 3 + 0, length: 32 + 0 }, %)
+        |> angledLine({ angle = 3 + 0, length = 32 + 0 }, %)
         |> lineTo([33, 11.5 + 0], %)
         |> xLineTo(9 - 5, %)
         |> yLineTo(-10.77, %, $a)
         |> xLine(26.04, %)
         |> yLine(21.14 + 0, %)
-        |> angledLineOfXLength({ angle: 181 + 0, length: 23.14 }, %)
-        |> angledLineOfYLength({ angle: -91, length: 19 + 0 }, %)
-        |> angledLineToX({ angle: 3 + 0, to: 26 }, %)
-        |> angledLineToY({ angle: 89, to: 9.14 + 0 }, %)
+        |> angledLineOfXLength({ angle = 181 + 0, length = 23.14 }, %)
+        |> angledLineOfYLength({ angle = -91, length = 19 + 0 }, %)
+        |> angledLineToX({ angle = 3 + 0, to = 26 }, %)
+        |> angledLineToY({ angle = 89, to = 9.14 + 0 }, %)
         |> angledLineThatIntersects({
-        angle: 4.14,
-        intersectTag: a,
-        offset: 9
+        angle = 4.14,
+        intersectTag = a,
+        offset = 9
       }, %)
         |> tangentialArcTo([3.14 + 13, 3.14], %)
       `
@@ -456,8 +454,8 @@ test.describe('Testing segment overlays', () => {
 
       await expect(page.getByTestId('segment-overlay')).toHaveCount(13)
 
-      const clickUnconstrained = _clickUnconstrained(page)
-      const clickConstrained = _clickConstrained(page)
+      const clickUnconstrained = _clickUnconstrained(page, editor)
+      const clickConstrained = _clickConstrained(page, editor)
 
       let ang = 0
 
@@ -540,6 +538,7 @@ test.describe('Testing segment overlays', () => {
     })
     test('for segments [angledLineToX, angledLineToY, angledLineThatIntersects]', async ({
       page,
+      editor,
       homePage,
     }) => {
       await page.addInitScript(async () => {
@@ -548,20 +547,20 @@ test.describe('Testing segment overlays', () => {
           `part001 = startSketchOn('XZ')
         |> startProfileAt([0, 0], %)
         |> line([0.5, -14 + 0], %)
-        |> angledLine({ angle: 3 + 0, length: 32 + 0 }, %)
+        |> angledLine({ angle = 3 + 0, length = 32 + 0 }, %)
         |> lineTo([33, 11.5 + 0], %)
         |> xLineTo(9 - 5, %)
         |> yLineTo(-10.77, %, $a)
         |> xLine(26.04, %)
         |> yLine(21.14 + 0, %)
-        |> angledLineOfXLength({ angle: 181 + 0, length: 23.14 }, %)
-        |> angledLineOfYLength({ angle: -91, length: 19 + 0 }, %)
-        |> angledLineToX({ angle: 3 + 0, to: 26 }, %)
-        |> angledLineToY({ angle: 89, to: 9.14 + 0 }, %)
+        |> angledLineOfXLength({ angle = 181 + 0, length = 23.14 }, %)
+        |> angledLineOfYLength({ angle = -91, length = 19 + 0 }, %)
+        |> angledLineToX({ angle = 3 + 0, to = 26 }, %)
+        |> angledLineToY({ angle = 89, to = 9.14 + 0 }, %)
         |> angledLineThatIntersects({
-        angle: 4.14,
-        intersectTag: a,
-        offset: 9
+        angle = 4.14,
+        intersectTag = a,
+        offset = 9
       }, %)
         |> tangentialArcTo([3.14 + 13, 1.14], %)
       `
@@ -585,8 +584,8 @@ test.describe('Testing segment overlays', () => {
 
       await expect(page.getByTestId('segment-overlay')).toHaveCount(13)
 
-      const clickUnconstrained = _clickUnconstrained(page)
-      const clickConstrained = _clickConstrained(page)
+      const clickUnconstrained = _clickUnconstrained(page, editor)
+      const clickConstrained = _clickConstrained(page, editor)
 
       let ang = 0
 
@@ -655,19 +654,19 @@ test.describe('Testing segment overlays', () => {
         },
         constraintType: 'angle',
         expectBeforeUnconstrained: `angledLineThatIntersects({
-    angle: 4.14,
-    intersectTag: a,
-    offset: 9
+    angle = 4.14,
+    intersectTag = a,
+    offset = 9
         }, %)`,
         expectAfterUnconstrained: `angledLineThatIntersects({
-    angle: angle003,
-    intersectTag: a,
-    offset: 9
+    angle = angle003,
+    intersectTag = a,
+    offset = 9
         }, %)`,
         expectFinal: `angledLineThatIntersects({
-    angle: -176,
-    offset: 9,
-    intersectTag: a
+    angle = -176,
+    offset = 9,
+    intersectTag = a
         }, %)`,
         ang: ang + 180,
         locator: '[data-overlay-toolbar-index="11"]',
@@ -680,45 +679,45 @@ test.describe('Testing segment overlays', () => {
         },
         constraintType: 'intersectionOffset',
         expectBeforeUnconstrained: `angledLineThatIntersects({
-    angle: -176,
-    offset: 9,
-    intersectTag: a
+    angle = -176,
+    offset = 9,
+    intersectTag = a
         }, %)`,
         expectAfterUnconstrained: `angledLineThatIntersects({
-    angle: -176,
-    offset: perpDist001,
-    intersectTag: a
+    angle = -176,
+    offset = perpDist001,
+    intersectTag = a
         }, %)`,
         expectFinal: `angledLineThatIntersects({
-    angle: -176,
-    offset: 9,
-    intersectTag: a
+    angle = -176,
+    offset = 9,
+    intersectTag = a
         }, %)`,
         ang: ang + 180,
         locator: '[data-overlay-toolbar-index="11"]',
       })
     })
-    test('for segment [tangentialArcTo]', async ({ page, homePage }) => {
+    test('for segment [tangentialArcTo]', async ({ page, editor, homePage }) => {
       await page.addInitScript(async () => {
         localStorage.setItem(
           'persistCode',
           `part001 = startSketchOn('XZ')
         |> startProfileAt([0, 0], %)
         |> line([0.5, -14 + 0], %)
-        |> angledLine({ angle: 3 + 0, length: 32 + 0 }, %)
+        |> angledLine({ angle = 3 + 0, length = 32 + 0 }, %)
         |> lineTo([33, 11.5 + 0], %)
         |> xLineTo(9 - 5, %)
         |> yLineTo(-10.77, %, $a)
         |> xLine(26.04, %)
         |> yLine(21.14 + 0, %)
-        |> angledLineOfXLength({ angle: 181 + 0, length: 23.14 }, %)
-        |> angledLineOfYLength({ angle: -91, length: 19 + 0 }, %)
-        |> angledLineToX({ angle: 3 + 0, to: 26 }, %)
-        |> angledLineToY({ angle: 89, to: 9.14 + 0 }, %)
+        |> angledLineOfXLength({ angle = 181 + 0, length = 23.14 }, %)
+        |> angledLineOfYLength({ angle = -91, length = 19 + 0 }, %)
+        |> angledLineToX({ angle = 3 + 0, to = 26 }, %)
+        |> angledLineToY({ angle = 89, to = 9.14 + 0 }, %)
         |> angledLineThatIntersects({
-        angle: 4.14,
-        intersectTag: a,
-        offset: 9
+        angle = 4.14,
+        intersectTag = a,
+        offset = 9
       }, %)
         |> tangentialArcTo([3.14 + 13, -3.14], %)
       `
@@ -742,8 +741,8 @@ test.describe('Testing segment overlays', () => {
 
       await expect(page.getByTestId('segment-overlay')).toHaveCount(13)
 
-      const clickUnconstrained = _clickUnconstrained(page)
-      const clickConstrained = _clickConstrained(page)
+      const clickUnconstrained = _clickUnconstrained(page, editor)
+      const clickConstrained = _clickConstrained(page, editor)
 
       const tangentialArcTo = await u.getBoundingBox(
         '[data-overlay-index="12"]'
@@ -772,12 +771,12 @@ test.describe('Testing segment overlays', () => {
         locator: '[data-overlay-toolbar-index="12"]',
       })
     })
-    test('for segment [circle]', async ({ page, homePage }) => {
+    test('for segment [circle]', async ({ page, editor, homePage }) => {
       await page.addInitScript(async () => {
         localStorage.setItem(
           'persistCode',
           `part001 = startSketchOn('XZ')
-      |> circle({ center: [1 + 0, 0], radius: 8 }, %)
+      |> circle({ center = [1 + 0, 0], radius = 8 }, %)
     `
         )
         localStorage.setItem('disableAxis', 'true')
@@ -801,8 +800,8 @@ test.describe('Testing segment overlays', () => {
 
       await expect(page.getByTestId('segment-overlay')).toHaveCount(1)
 
-      const clickUnconstrained = _clickUnconstrained(page)
-      const clickConstrained = _clickConstrained(page)
+      const clickUnconstrained = _clickUnconstrained(page, editor)
+      const clickConstrained = _clickConstrained(page, editor)
 
       const hoverPos = { x: 789, y: 114 } as const
       let ang = await u.getAngle('[data-overlay-index="0"]')
@@ -828,8 +827,8 @@ test.describe('Testing segment overlays', () => {
         expectAfterUnconstrained:
           'circle({ center = [xAbs001, yAbs001], radius =  8 }, %)',
         expectFinal: 'circle({ center = [xAbs001, 0], radius =  8 }, %)',
-        ang: ang + 105,
-        steps: 10,
+        ang: ang + 180,
+        steps: 30,
         locator: '[data-overlay-toolbar-index="0"]',
       })
       console.log('circle radius')
@@ -849,7 +848,7 @@ test.describe('Testing segment overlays', () => {
   })
   test.describe('Testing deleting a segment', () => {
     const _deleteSegmentSequence =
-      (page: Page) =>
+      (page: Page, editor: EditorFixture) =>
       async ({
         hoverPos,
         codeToBeDeleted,
@@ -875,37 +874,36 @@ test.describe('Testing segment overlays', () => {
         y = hoverPos.y - Math.sin(ang * deg) * 32
         await page.mouse.move(x, y)
         await wiggleMove(page, x, y, 20, 30, ang, 10, 5, locator)
+        await page.mouse.move(x, y)
 
-        await expect(page.locator('.cm-content')).toContainText(codeToBeDeleted)
+        await editor.expectEditor.toContain(codeToBeDeleted, { shouldNormalise: true })
 
         await page.locator(`[data-stdlib-fn-name="${stdLibFnName}"]`).click()
         await page.getByText('Delete Segment').click()
 
-        await expect(page.locator('.cm-content')).not.toContainText(
-          codeToBeDeleted
-        )
+        await editor.expectEditor.not.toContain(codeToBeDeleted, { shouldNormalise: true })
       }
-    test('all segment types', async ({ page, homePage }) => {
+    test('all segment types', async ({ page, editor, homePage }) => {
       await page.addInitScript(async () => {
         localStorage.setItem(
           'persistCode',
           `part001 = startSketchOn('XZ')
       |> startProfileAt([0, 0], %)
       |> line([0.5, -14 + 0], %)
-      |> angledLine({ angle: 3 + 0, length: 32 + 0 }, %)
+      |> angledLine({ angle = 3 + 0, length = 32 + 0 }, %)
       |> lineTo([33, 11.5 + 0], %)
       |> xLineTo(9 - 5, %)
       |> yLineTo(-10.77, %, $a)
       |> xLine(26.04, %)
       |> yLine(21.14 + 0, %)
-      |> angledLineOfXLength({ angle: 181 + 0, length: 23.14 }, %)
-      |> angledLineOfYLength({ angle: -91, length: 19 + 0 }, %)
-      |> angledLineToX({ angle: 3 + 0, to: 26 }, %)
-      |> angledLineToY({ angle: 89, to: 9.14 + 0 }, %)
+      |> angledLineOfXLength({ angle = 181 + 0, length = 23.14 }, %)
+      |> angledLineOfYLength({ angle = -91, length = 19 + 0 }, %)
+      |> angledLineToX({ angle = 3 + 0, to = 26 }, %)
+      |> angledLineToY({ angle = 89, to = 9.14 + 0 }, %)
       |> angledLineThatIntersects({
-     angle: 4.14,
-     intersectTag: a,
-     offset: 9
+     angle = 4.14,
+     intersectTag = a,
+     offset = 9
          }, %)
       |> tangentialArcTo([3.14 + 13, 1.14], %)
       `
@@ -916,6 +914,7 @@ test.describe('Testing segment overlays', () => {
       await page.setViewportSize({ width: 1200, height: 500 })
 
       await homePage.goToModelingScene()
+      await u.waitForPageLoad()
 
       // wait for execution done
       await u.openDebugPanel()
@@ -928,7 +927,7 @@ test.describe('Testing segment overlays', () => {
       await page.waitForTimeout(500)
 
       await expect(page.getByTestId('segment-overlay')).toHaveCount(13)
-      const deleteSegmentSequence = _deleteSegmentSequence(page)
+      const deleteSegmentSequence = _deleteSegmentSequence(page, editor)
 
       let segmentToDelete
 
@@ -950,9 +949,9 @@ test.describe('Testing segment overlays', () => {
       await deleteSegmentSequence({
         hoverPos: { x: segmentToDelete.x, y: segmentToDelete.y },
         codeToBeDeleted: `angledLineThatIntersects({
-    angle: 4.14,
-    intersectTag: a,
-    offset: 9
+      angle = 4.14,
+      intersectTag = a,
+      offset = 9
         }, %)`,
         stdLibFnName: 'angledLineThatIntersects',
         ang: ang + 180,
@@ -1061,16 +1060,15 @@ test.describe('Testing segment overlays', () => {
         5,
         '[data-overlay-toolbar-index="2"]'
       )
+      await page.mouse.move(hoverPos.x, hoverPos.y)
 
       const codeToBeDeleted = 'lineTo([33, 11.5 + 0], %)'
-      await expect(page.locator('.cm-content')).toContainText(codeToBeDeleted)
+      await editor.expectEditor.toContain(codeToBeDeleted, { shouldNormalise: true })
 
       await page.getByTestId('overlay-menu').click()
       await page.getByText('Delete Segment').click()
 
-      await expect(page.locator('.cm-content')).not.toContainText(
-        codeToBeDeleted
-      )
+      await editor.expectEditor.not.toContain(codeToBeDeleted, { shouldNormalise: true })
 
       segmentToDelete = await getOverlayByIndex(1)
       ang = await u.getAngle(`[data-overlay-index="${1}"]`)
@@ -1116,7 +1114,7 @@ test.describe('Testing segment overlays', () => {
         const isObj = lineOfInterest.includes('{ angle = 3,')
         test(`${lineOfInterest.split('(')[0]}${isObj ? '-[obj-input]' : ''}${
           doesHaveTagOutsideSketch ? '-[tagOutsideSketch]' : ''
-        }`, async ({ page, homePage }) => {
+        }`, async ({ page, editor, homePage }) => {
           await page.addInitScript(
             async ({ lineToBeDeleted, extraLine }) => {
               localStorage.setItem(
@@ -1165,9 +1163,7 @@ test.describe('Testing segment overlays', () => {
           await page.mouse.move(hoverPos.x + x, hoverPos.y + y)
           await page.mouse.move(hoverPos.x, hoverPos.y, { steps: 5 })
 
-          await expect(page.locator('.cm-content')).toContainText(
-            lineOfInterest
-          )
+          await editor.expectEditor.toContain(lineOfInterest, { shouldNormalise: true })
 
           await page.getByTestId('overlay-menu').click()
           await page.waitForTimeout(100)
@@ -1178,9 +1174,7 @@ test.describe('Testing segment overlays', () => {
           await page.mouse.move(hoverPos.x + x, hoverPos.y + y)
           await page.mouse.move(hoverPos.x, hoverPos.y, { steps: 5 })
 
-          await expect(page.locator('.cm-content')).toContainText(
-            lineOfInterest
-          )
+          await editor.expectEditor.toContain(lineOfInterest, { shouldNormalise: true })
 
           await page.getByTestId('overlay-menu').click()
           await page.waitForTimeout(100)
@@ -1196,16 +1190,12 @@ test.describe('Testing segment overlays', () => {
               )
             ).toBeTruthy()
             // eslint-disable-next-line jest/no-conditional-expect
-            await expect(page.locator('.cm-content')).toContainText(
-              lineOfInterest
-            )
+            await editor.expectEditor.toContain(lineOfInterest, { shouldNormalise: true })
           } else {
             // eslint-disable-next-line jest/no-conditional-expect
-            await expect(page.locator('.cm-content')).not.toContainText(
-              lineOfInterest
-            )
+            await editor.expectEditor.not.toContain(lineOfInterest, { shouldNormalise: true })
             // eslint-disable-next-line jest/no-conditional-expect
-            await expect(page.locator('.cm-content')).not.toContainText('seg01')
+            await editor.expectEditor.not.toContain('seg01', { shouldNormalise: true })
           }
         })
       }
@@ -1276,6 +1266,7 @@ test.describe('Testing segment overlays', () => {
       const isObj = before.includes('{ angle = 3')
       test(`${before.split('(')[0]}${isObj ? '-[obj-input]' : ''}`, async ({
         page,
+        editor,
         homePage,
       }) => {
         await page.addInitScript(
@@ -1297,6 +1288,7 @@ test.describe('Testing segment overlays', () => {
         await page.setViewportSize({ width: 1200, height: 500 })
 
         await homePage.goToModelingScene()
+        await u.waitForPageLoad()
         await page.waitForTimeout(300)
 
         await page.getByText(before).click()
@@ -1329,14 +1321,16 @@ test.describe('Testing segment overlays', () => {
           5,
           '[data-overlay-toolbar-index="0"]'
         )
+        await page.mouse.move(x, y)
 
-        await expect(page.locator('.cm-content')).toContainText(before)
+        await editor.expectEditor.toContain(before, { shouldNormalise: true })
 
         await page.getByTestId('overlay-menu').click()
         await page.waitForTimeout(100)
         await page.getByText('Remove constraints').click()
 
-        await expect(page.locator('.cm-content')).toContainText(after)
+        await editor.expectEditor.toContain(after, { shouldNormalise: true })
+
         // check the cursor was left in the correct place after transform
         await expect(page.locator('.cm-activeLine')).toHaveText('|> ' + after)
         await expect(page.getByTestId('segment-overlay')).toHaveCount(3)
