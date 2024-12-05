@@ -80,7 +80,10 @@ jobs:
         run: echo "version=`cat package.json | jq -r '.version'`" >> "$GITHUB_OUTPUT"
 
       - id: export_notes
-        run: echo "notes=`cat release-notes.md`" >> "$GITHUB_OUTPUT"
+        run: |
+          output="$(cat release-notes.md)"
+          echo $output
+          echo "notes=$output" >> "$GITHUB_OUTPUT"
 
       - name: Prepare electron-builder.yml file for updater test
         if: ${{ env.IS_RELEASE == 'true' }}
