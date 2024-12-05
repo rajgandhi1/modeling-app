@@ -760,20 +760,30 @@ const loftPointAndClickCases = [
 ]
 loftPointAndClickCases.forEach(({ shouldPreselect }) => {
   test(`Loft point-and-click (preselected sketches: ${shouldPreselect})`, async ({
-    app,
+    context,
+    homePage,
     page,
     scene,
     editor,
     toolbar,
     cmdBar,
   }) => {
+    const u = await getUtils(page)
     const initialCode = `sketch001 = startSketchOn('XZ')
     |> circle({ center = [0, 0], radius = 30 }, %)
     plane001 = offsetPlane('XZ', 50)
     sketch002 = startSketchOn(plane001)
     |> circle({ center = [0, 0], radius = 20 }, %)
 `
-    await app.initialise(initialCode)
+    await page.setBodyDimensions({ width: 1000, height: 500 })
+
+    await context.addInitScript((code) => {
+      localStorage.setItem('persistCode', code)
+    }, initialCode)
+
+    await homePage.goToModelingScene()
+    await u.waitForPageLoad()
+    await page.waitForTimeout(1000)
 
     // One dumb hardcoded screen pixel value
     const testPoint = { x: 575, y: 200 }
@@ -792,7 +802,7 @@ loftPointAndClickCases.forEach(({ shouldPreselect }) => {
       await clickOnSketch1()
       await page.keyboard.down('Shift')
       await clickOnSketch2()
-      await app.page.waitForTimeout(500)
+      await page.waitForTimeout(500)
       await page.keyboard.up('Shift')
     }
 
