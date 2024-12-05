@@ -3,6 +3,7 @@ import { test, expect, Page } from './zoo-test'
 import { deg, getUtils, wiggleMove } from './test-utils'
 import { LineInputsType } from 'lang/std/sketchcombos'
 import { uuidv4 } from 'lib/utils'
+import { EditorFixture } from './fixtures/editorFixture'
 
 test.describe('Testing segment overlays', () => {
   test.describe('Hover over a segment should show its overlay, hovering over the input overlays should show its popover, clicking the input overlay should constrain/unconstrain it:\nfor the following segments', () => {
@@ -52,7 +53,9 @@ test.describe('Testing segment overlays', () => {
         await wiggleMove(page, x, y, 20, 30, ang, 10, 5, locator)
         await page.mouse.move(x, y)
 
-        await editor.expectEditor.toContain(expectBeforeUnconstrained, { shouldNormalise: true })
+        await editor.expectEditor.toContain(expectBeforeUnconstrained, {
+          shouldNormalise: true,
+        })
         const constrainedLocator = page.locator(
           `[data-constraint-type="${constraintType}"][data-is-constrained="true"]`
         )
@@ -62,7 +65,9 @@ test.describe('Testing segment overlays', () => {
           await page.getByTestId('constraint-symbol-popover').count()
         ).toBeGreaterThan(0)
         await constrainedLocator.click()
-        await editor.expectEditor.toContain(expectAfterUnconstrained, { shouldNormalise: true })
+        await editor.expectEditor.toContain(expectAfterUnconstrained, {
+          shouldNormalise: true,
+        })
 
         await page.mouse.move(0, 0)
         await page.waitForTimeout(1000)
@@ -82,7 +87,9 @@ test.describe('Testing segment overlays', () => {
         ).toBeGreaterThan(0)
         await unconstrainedLocator.click()
         await page.getByText('Add variable').click()
-        await editor.expectEditor.toContain(expectFinal, { shouldNormalise: true })
+        await editor.expectEditor.toContain(expectFinal, {
+          shouldNormalise: true,
+        })
       }
 
     /**
@@ -130,7 +137,9 @@ test.describe('Testing segment overlays', () => {
         await page.mouse.move(x, y)
 
         await expect(page.getByText('Added variable')).not.toBeVisible()
-        await editor.expectEditor.toContain(expectBeforeUnconstrained, { shouldNormalise: true })
+        await editor.expectEditor.toContain(expectBeforeUnconstrained, {
+          shouldNormalise: true,
+        })
         const unconstrainedLocator = page.locator(
           `[data-constraint-type="${constraintType}"][data-is-constrained="false"]`
         )
@@ -141,7 +150,9 @@ test.describe('Testing segment overlays', () => {
         ).toBeGreaterThan(0)
         await unconstrainedLocator.click()
         await page.getByText('Add variable').click()
-        await editor.expectEditor.toContain(expectAfterUnconstrained, { shouldNormalise: true })
+        await editor.expectEditor.toContain(expectAfterUnconstrained, {
+          shouldNormalise: true,
+        })
         await expect(page.getByText('Added variable')).not.toBeVisible()
 
         await page.mouse.move(0, 0)
@@ -161,7 +172,9 @@ test.describe('Testing segment overlays', () => {
           await page.getByTestId('constraint-symbol-popover').count()
         ).toBeGreaterThan(0)
         await constrainedLocator.click()
-        await editor.expectEditor.toContain(expectFinal, { shouldNormalise: true })
+        await editor.expectEditor.toContain(expectFinal, {
+          shouldNormalise: true,
+        })
       }
     test.setTimeout(120000)
     test('for segments [line, angledLine, lineTo, xLineTo]', async ({
@@ -330,7 +343,11 @@ test.describe('Testing segment overlays', () => {
         locator: '[data-overlay-toolbar-index="3"]',
       })
     })
-    test('for segments [yLineTo, xLine]', async ({ page, editor, homePage }) => {
+    test('for segments [yLineTo, xLine]', async ({
+      page,
+      editor,
+      homePage,
+    }) => {
       await page.addInitScript(async () => {
         localStorage.setItem(
           'persistCode',
@@ -697,7 +714,11 @@ test.describe('Testing segment overlays', () => {
         locator: '[data-overlay-toolbar-index="11"]',
       })
     })
-    test('for segment [tangentialArcTo]', async ({ page, editor, homePage }) => {
+    test('for segment [tangentialArcTo]', async ({
+      page,
+      editor,
+      homePage,
+    }) => {
       await page.addInitScript(async () => {
         localStorage.setItem(
           'persistCode',
@@ -876,12 +897,16 @@ test.describe('Testing segment overlays', () => {
         await wiggleMove(page, x, y, 20, 30, ang, 10, 5, locator)
         await page.mouse.move(x, y)
 
-        await editor.expectEditor.toContain(codeToBeDeleted, { shouldNormalise: true })
+        await editor.expectEditor.toContain(codeToBeDeleted, {
+          shouldNormalise: true,
+        })
 
         await page.locator(`[data-stdlib-fn-name="${stdLibFnName}"]`).click()
         await page.getByText('Delete Segment').click()
 
-        await editor.expectEditor.not.toContain(codeToBeDeleted, { shouldNormalise: true })
+        await editor.expectEditor.not.toContain(codeToBeDeleted, {
+          shouldNormalise: true,
+        })
       }
     test('all segment types', async ({ page, editor, homePage }) => {
       await page.addInitScript(async () => {
@@ -1063,12 +1088,16 @@ test.describe('Testing segment overlays', () => {
       await page.mouse.move(hoverPos.x, hoverPos.y)
 
       const codeToBeDeleted = 'lineTo([33, 11.5 + 0], %)'
-      await editor.expectEditor.toContain(codeToBeDeleted, { shouldNormalise: true })
+      await editor.expectEditor.toContain(codeToBeDeleted, {
+        shouldNormalise: true,
+      })
 
       await page.getByTestId('overlay-menu').click()
       await page.getByText('Delete Segment').click()
 
-      await editor.expectEditor.not.toContain(codeToBeDeleted, { shouldNormalise: true })
+      await editor.expectEditor.not.toContain(codeToBeDeleted, {
+        shouldNormalise: true,
+      })
 
       segmentToDelete = await getOverlayByIndex(1)
       ang = await u.getAngle(`[data-overlay-index="${1}"]`)
@@ -1163,7 +1192,9 @@ test.describe('Testing segment overlays', () => {
           await page.mouse.move(hoverPos.x + x, hoverPos.y + y)
           await page.mouse.move(hoverPos.x, hoverPos.y, { steps: 5 })
 
-          await editor.expectEditor.toContain(lineOfInterest, { shouldNormalise: true })
+          await editor.expectEditor.toContain(lineOfInterest, {
+            shouldNormalise: true,
+          })
 
           await page.getByTestId('overlay-menu').click()
           await page.waitForTimeout(100)
@@ -1174,7 +1205,9 @@ test.describe('Testing segment overlays', () => {
           await page.mouse.move(hoverPos.x + x, hoverPos.y + y)
           await page.mouse.move(hoverPos.x, hoverPos.y, { steps: 5 })
 
-          await editor.expectEditor.toContain(lineOfInterest, { shouldNormalise: true })
+          await editor.expectEditor.toContain(lineOfInterest, {
+            shouldNormalise: true,
+          })
 
           await page.getByTestId('overlay-menu').click()
           await page.waitForTimeout(100)
@@ -1190,12 +1223,18 @@ test.describe('Testing segment overlays', () => {
               )
             ).toBeTruthy()
             // eslint-disable-next-line jest/no-conditional-expect
-            await editor.expectEditor.toContain(lineOfInterest, { shouldNormalise: true })
+            await editor.expectEditor.toContain(lineOfInterest, {
+              shouldNormalise: true,
+            })
           } else {
             // eslint-disable-next-line jest/no-conditional-expect
-            await editor.expectEditor.not.toContain(lineOfInterest, { shouldNormalise: true })
+            await editor.expectEditor.not.toContain(lineOfInterest, {
+              shouldNormalise: true,
+            })
             // eslint-disable-next-line jest/no-conditional-expect
-            await editor.expectEditor.not.toContain('seg01', { shouldNormalise: true })
+            await editor.expectEditor.not.toContain('seg01', {
+              shouldNormalise: true,
+            })
           }
         })
       }

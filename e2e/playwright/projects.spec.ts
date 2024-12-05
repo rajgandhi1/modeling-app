@@ -1245,7 +1245,7 @@ test(
         .locator('section#projectDirectory input')
         .inputValue()
 
-      const handleFile = electronApp.evaluate(
+      const handleFile = electronApp?.evaluate(
         async ({ dialog }, filePaths) => {
           dialog.showOpenDialog = () =>
             Promise.resolve({ canceled: false, filePaths })
@@ -1275,7 +1275,7 @@ test(
 
       await page.getByTestId('project-directory-settings-link').click()
 
-      const handleFile = electronApp.evaluate(
+      const handleFile = electronApp?.evaluate(
         async ({ dialog }, filePaths) => {
           dialog.showOpenDialog = () =>
             Promise.resolve({ canceled: false, filePaths })
