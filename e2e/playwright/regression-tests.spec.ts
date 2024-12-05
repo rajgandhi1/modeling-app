@@ -563,7 +563,7 @@ extrude001 = extrude(50, sketch001)
     const u = await getUtils(page)
 
     // Constants and locators
-    const planeColor: [number, number, number] = [170, 220, 170]
+    const planeColor: [number, number, number] = [161, 220, 155]
     const bgColor: [number, number, number] = [27, 27, 27]
     const middlePixelIsColor = async (color: [number, number, number]) => {
       return u.getGreatestPixDiff({ x: 600, y: 250 }, color)
