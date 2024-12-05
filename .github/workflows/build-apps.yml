@@ -47,6 +47,12 @@ jobs:
       - name: Run build:wasm
         run: "yarn build:wasm"
 
+      - name: Fetch previous nightly tags
+        # Note: prefered going this way instead of a full clone in the checkout step,
+        # see https://github.com/actions/checkout/issues/1471
+        if: ${{ env.IS_NIGHTLY == 'true' }}
+        run: git fetch --prune --unshallow --tags
+
       - name: Set nightly version, product name, release notes, and icons
         if: ${{ env.IS_NIGHTLY == 'true' }}
         run: yarn files:flip-to-nightly
