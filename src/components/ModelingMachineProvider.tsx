@@ -50,6 +50,7 @@ import {
   isSketchPipe,
   Selections,
   updateSelections,
+  canLoftSelection,
 } from 'lib/selections'
 import { applyConstraintIntersect } from './Toolbar/Intersect'
 import { applyConstraintAbsDistance } from './Toolbar/SetAbsDistance'
@@ -66,7 +67,7 @@ import {
   sketchOnOffsetPlane,
   startSketchOnDefault,
 } from 'lang/modifyAst'
-import { Program, parse, recast } from 'lang/wasm'
+import { Program, parse, recast, resultIsOk } from 'lang/wasm'
 import {
   doesSceneHaveSweepableSketch,
   getNodePathFromSourceRange,
@@ -82,7 +83,7 @@ import { getVarNameModal } from 'hooks/useToolbarGuards'
 import { err, reportRejection, trap } from 'lib/trap'
 import { useCommandsContext } from 'hooks/useCommandsContext'
 import { modelingMachineEvent } from 'editor/manager'
-import { hasValidFilletSelection } from 'lang/modifyAst/addFillet'
+import { hasValidEdgeTreatmentSelection } from 'lang/modifyAst/addEdgeTreatment'
 import {
   ExportIntent,
   EngineConnectionStateType,
@@ -570,6 +571,21 @@ export const ModelingMachineProvider = ({
           if (err(canSweep)) return false
           return canSweep
         },
+        'has valid loft selection': ({ context: { selectionRanges } }) => {
+          const hasNoSelection =
+            selectionRanges.graphSelections.length === 0 ||
+            isRangeBetweenCharacters(selectionRanges) ||
+            isSelectionLastLine(selectionRanges, codeManager.code)
+
+          if (hasNoSelection) {
+            const count = 2
+            return doesSceneHaveSweepableSketch(kclManager.ast, count)
+          }
+
+          const canLoft = canLoftSelection(selectionRanges)
+          if (err(canLoft)) return false
+          return canLoft
+        },
         'has valid selection for deletion': ({
           context: { selectionRanges },
         }) => {
@@ -577,8 +593,10 @@ export const ModelingMachineProvider = ({
           if (selectionRanges.graphSelections.length <= 0) return false
           return true
         },
-        'has valid fillet selection': ({ context: { selectionRanges } }) => {
-          return hasValidFilletSelection({
+        'has valid edge treatment selection': ({
+          context: { selectionRanges },
+        }) => {
+          return hasValidEdgeTreatmentSelection({
             selectionRanges,
             ast: kclManager.ast,
             code: codeManager.code,
@@ -595,15 +613,11 @@ export const ModelingMachineProvider = ({
           )
         },
         'Has exportable geometry': () => {
-          if (
-            kclManager.kclErrors.length === 0 &&
-            kclManager.ast.body.length > 0
-          )
+          if (!kclManager.hasErrors() && kclManager.ast.body.length > 0)
             return true
           else {
             let errorMessage = 'Unable to Export '
-            if (kclManager.kclErrors.length > 0)
-              errorMessage += 'due to KCL Errors'
+            if (kclManager.hasErrors()) errorMessage += 'due to KCL Errors'
             else if (kclManager.ast.body.length === 0)
               errorMessage += 'due to Empty Scene'
             console.error(errorMessage)
@@ -721,7 +735,11 @@ export const ModelingMachineProvider = ({
                 constraint: 'setHorzDistance',
                 selectionRanges,
               })
-            const _modifiedAst = parse(recast(modifiedAst))
+            const pResult = parse(recast(modifiedAst))
+            if (trap(pResult) || !resultIsOk(pResult))
+              return Promise.reject(new Error('Unexpected compilation error'))
+            const _modifiedAst = pResult.program
+
             if (!sketchDetails)
               return Promise.reject(new Error('No sketch details'))
             const updatedPathToNode = updatePathToNodeFromMap(
@@ -762,7 +780,10 @@ export const ModelingMachineProvider = ({
                 constraint: 'setVertDistance',
                 selectionRanges,
               })
-            const _modifiedAst = parse(recast(modifiedAst))
+            const pResult = parse(recast(modifiedAst))
+            if (trap(pResult) || !resultIsOk(pResult))
+              return Promise.reject(new Error('Unexpected compilation error'))
+            const _modifiedAst = pResult.program
             if (!sketchDetails)
               return Promise.reject(new Error('No sketch details'))
             const updatedPathToNode = updatePathToNodeFromMap(
@@ -810,7 +831,10 @@ export const ModelingMachineProvider = ({
                   selectionRanges,
                   angleOrLength: 'setAngle',
                 }))
-            const _modifiedAst = parse(recast(modifiedAst))
+            const pResult = parse(recast(modifiedAst))
+            if (trap(pResult) || !resultIsOk(pResult))
+              return Promise.reject(new Error('Unexpected compilation error'))
+            const _modifiedAst = pResult.program
             if (err(_modifiedAst)) return Promise.reject(_modifiedAst)
 
             if (!sketchDetails)
@@ -852,7 +876,10 @@ export const ModelingMachineProvider = ({
               await applyConstraintAngleLength({
                 selectionRanges,
               })
-            const _modifiedAst = parse(recast(modifiedAst))
+            const pResult = parse(recast(modifiedAst))
+            if (trap(pResult) || !resultIsOk(pResult))
+              return Promise.reject(new Error('Unexpected compilation error'))
+            const _modifiedAst = pResult.program
             if (!sketchDetails)
               return Promise.reject(new Error('No sketch details'))
             const updatedPathToNode = updatePathToNodeFromMap(
@@ -892,7 +919,10 @@ export const ModelingMachineProvider = ({
               await applyConstraintIntersect({
                 selectionRanges,
               })
-            const _modifiedAst = parse(recast(modifiedAst))
+            const pResult = parse(recast(modifiedAst))
+            if (trap(pResult) || !resultIsOk(pResult))
+              return Promise.reject(new Error('Unexpected compilation error'))
+            const _modifiedAst = pResult.program
             if (!sketchDetails)
               return Promise.reject(new Error('No sketch details'))
             const updatedPathToNode = updatePathToNodeFromMap(
@@ -933,7 +963,10 @@ export const ModelingMachineProvider = ({
                 constraint: 'xAbs',
                 selectionRanges,
               })
-            const _modifiedAst = parse(recast(modifiedAst))
+            const pResult = parse(recast(modifiedAst))
+            if (trap(pResult) || !resultIsOk(pResult))
+              return Promise.reject(new Error('Unexpected compilation error'))
+            const _modifiedAst = pResult.program
             if (!sketchDetails)
               return Promise.reject(new Error('No sketch details'))
             const updatedPathToNode = updatePathToNodeFromMap(
@@ -974,7 +1007,10 @@ export const ModelingMachineProvider = ({
                 constraint: 'yAbs',
                 selectionRanges,
               })
-            const _modifiedAst = parse(recast(modifiedAst))
+            const pResult = parse(recast(modifiedAst))
+            if (trap(pResult) || !resultIsOk(pResult))
+              return Promise.reject(new Error('Unexpected compilation error'))
+            const _modifiedAst = pResult.program
             if (!sketchDetails)
               return Promise.reject(new Error('No sketch details'))
             const updatedPathToNode = updatePathToNodeFromMap(
@@ -1015,9 +1051,10 @@ export const ModelingMachineProvider = ({
             const { variableName } = await getVarNameModal({
               valueName: data?.variableName || 'var',
             })
-            let parsed = parse(recast(kclManager.ast))
-            if (trap(parsed)) return Promise.reject(parsed)
-            parsed = parsed as Node<Program>
+            let pResult = parse(recast(kclManager.ast))
+            if (trap(pResult) || !resultIsOk(pResult))
+              return Promise.reject(new Error('Unexpected compilation error'))
+            let parsed = pResult.program
 
             const { modifiedAst: _modifiedAst, pathToReplacedNode } =
               moveValueIntoNewVariablePath(
@@ -1026,7 +1063,11 @@ export const ModelingMachineProvider = ({
                 data?.pathToNode || [],
                 variableName
               )
-            parsed = parse(recast(_modifiedAst))
+            pResult = parse(recast(_modifiedAst))
+            if (trap(pResult) || !resultIsOk(pResult))
+              return Promise.reject(new Error('Unexpected compilation error'))
+            parsed = pResult.program
+
             if (trap(parsed)) return Promise.reject(parsed)
             parsed = parsed as Node<Program>
             if (!pathToReplacedNode)

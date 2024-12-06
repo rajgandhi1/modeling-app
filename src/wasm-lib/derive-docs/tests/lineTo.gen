@@ -3,7 +3,8 @@ mod test_examples_line_to {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_mock_example_line_to0() {
         let program =
-            crate::Program::parse("This is another code block.\nyes sirrr.\nlineTo").unwrap();
+            crate::Program::parse_no_errs("This is another code block.\nyes sirrr.\nlineTo")
+                .unwrap();
         let ctx = crate::executor::ExecutorContext {
             engine: std::sync::Arc::new(Box::new(
                 crate::engine::conn_mock::EngineConnection::new()
@@ -15,7 +16,7 @@ mod test_examples_line_to {
             settings: Default::default(),
             context_type: crate::executor::ContextType::Mock,
         };
-        ctx.run(&program, &mut crate::ExecState::default())
+        ctx.run(program.into(), &mut crate::ExecState::default())
             .await
             .unwrap();
     }
@@ -36,7 +37,8 @@ mod test_examples_line_to {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_mock_example_line_to1() {
-        let program = crate::Program::parse("This is code.\nIt does other shit.\nlineTo").unwrap();
+        let program =
+            crate::Program::parse_no_errs("This is code.\nIt does other shit.\nlineTo").unwrap();
         let ctx = crate::executor::ExecutorContext {
             engine: std::sync::Arc::new(Box::new(
                 crate::engine::conn_mock::EngineConnection::new()
@@ -48,7 +50,7 @@ mod test_examples_line_to {
             settings: Default::default(),
             context_type: crate::executor::ContextType::Mock,
         };
-        ctx.run(&program, &mut crate::ExecState::default())
+        ctx.run(program.into(), &mut crate::ExecState::default())
             .await
             .unwrap();
     }
@@ -108,6 +110,10 @@ impl crate::docs::StdLibFn for LineTo {
         vec![]
     }
 
+    fn keyword_arguments(&self) -> bool {
+        false
+    }
+
     fn args(&self, inline_subschemas: bool) -> Vec<crate::docs::StdLibFnArg> {
         let mut settings = schemars::gen::SchemaSettings::openapi3();
         settings.inline_subschemas = inline_subschemas;
@@ -118,12 +124,14 @@ impl crate::docs::StdLibFn for LineTo {
                 type_: "LineToData".to_string(),
                 schema: generator.root_schema_for::<LineToData>(),
                 required: true,
+                label_required: true,
             },
             crate::docs::StdLibFnArg {
                 name: "sketch".to_string(),
                 type_: "Sketch".to_string(),
                 schema: generator.root_schema_for::<Sketch>(),
                 required: true,
+                label_required: true,
             },
         ]
     }
@@ -138,6 +146,7 @@ impl crate::docs::StdLibFn for LineTo {
             type_: "Sketch".to_string(),
             schema,
             required: true,
+            label_required: true,
         })
     }
 
@@ -157,8 +166,8 @@ impl crate::docs::StdLibFn for LineTo {
         code_blocks
             .iter()
             .map(|cb| {
-                let program = crate::Program::parse(cb).unwrap();
-                let mut options: crate::ast::types::FormatOptions = Default::default();
+                let program = crate::Program::parse_no_errs(cb).unwrap();
+                let mut options: crate::parsing::ast::types::FormatOptions = Default::default();
                 options.insert_final_newline = false;
                 program.ast.recast(&options, 0)
             })

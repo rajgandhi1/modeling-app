@@ -8,12 +8,54 @@
 #[allow(unused_macros)]
 macro_rules! println {
     ($($rest:tt)*) => {
+        #[cfg(feature = "disable-println")]
+        {
+            let _ = format!($($rest)*);
+        }
         #[cfg(not(feature = "disable-println"))]
         std::println!($($rest)*)
     }
 }
 
-mod ast;
+#[allow(unused_macros)]
+macro_rules! eprintln {
+    ($($rest:tt)*) => {
+        #[cfg(feature = "disable-println")]
+        {
+            let _ = format!($($rest)*);
+        }
+        #[cfg(not(feature = "disable-println"))]
+        std::eprintln!($($rest)*)
+    }
+}
+
+#[allow(unused_macros)]
+macro_rules! print {
+    ($($rest:tt)*) => {
+        #[cfg(feature = "disable-println")]
+        {
+            let _ = format!($($rest)*);
+        }
+        #[cfg(not(feature = "disable-println"))]
+        std::print!($($rest)*)
+    }
+}
+
+#[allow(unused_macros)]
+macro_rules! eprint {
+    ($($rest:tt)*) => {
+        #[cfg(feature = "disable-println")]
+        {
+            let _ = format!($($rest)*);
+        }
+        #[cfg(not(feature = "disable-println"))]
+        std::eprint!($($rest)*)
+    }
+}
+#[cfg(feature = "dhat-heap")]
+#[global_allocator]
+static ALLOC: dhat::Alloc = dhat::Alloc;
+
 mod coredump;
 mod docs;
 mod engine;
@@ -23,31 +65,37 @@ mod fs;
 mod function_param;
 mod kcl_value;
 pub mod lint;
+mod log;
 mod lsp;
-mod parser;
+mod parsing;
 mod settings;
 #[cfg(test)]
 mod simulation_tests;
+mod source_range;
 mod std;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod test_server;
 mod thread;
-mod token;
 mod unparser;
 mod walk;
 #[cfg(target_arch = "wasm32")]
 mod wasm;
 
-pub use ast::modify::modify_ast_for_sketch;
-pub use ast::types::{FormatOptions, ModuleId};
 pub use coredump::CoreDump;
 pub use engine::{EngineManager, ExecutionKind};
-pub use errors::{ConnectionError, ExecError, KclError};
-pub use executor::{ExecState, ExecutorContext, ExecutorSettings, SourceRange};
-pub use lsp::copilot::Backend as CopilotLspBackend;
-pub use lsp::kcl::Backend as KclLspBackend;
-pub use lsp::kcl::Server as KclLspServerSubCommand;
+pub use errors::{CompilationError, ConnectionError, ExecError, KclError};
+pub use executor::{ExecState, ExecutorContext, ExecutorSettings};
+pub use lsp::{
+    copilot::Backend as CopilotLspBackend,
+    kcl::{Backend as KclLspBackend, Server as KclLspServerSubCommand},
+};
+pub use parsing::ast::{
+    cache::{CacheInformation, OldAstState},
+    modify::modify_ast_for_sketch,
+    types::FormatOptions,
+};
 pub use settings::types::{project::ProjectConfiguration, Configuration, UnitLength};
+pub use source_range::{ModuleId, SourceRange};
 
 // Rather than make executor public and make lots of it pub(crate), just re-export into a new module.
 // Ideally we wouldn't export these things at all, they should only be used for testing.
@@ -57,9 +105,11 @@ pub mod exec {
 
 #[cfg(target_arch = "wasm32")]
 pub mod wasm_engine {
-    pub use crate::coredump::wasm::{CoreDumpManager, CoreDumper};
-    pub use crate::engine::conn_wasm::{EngineCommandManager, EngineConnection};
-    pub use crate::fs::wasm::FileSystemManager;
+    pub use crate::{
+        coredump::wasm::{CoreDumpManager, CoreDumper},
+        engine::conn_wasm::{EngineCommandManager, EngineConnection},
+        fs::wasm::FileSystemManager,
+    };
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -73,10 +123,13 @@ pub mod std_utils {
 
 use serde::{Deserialize, Serialize};
 
+#[allow(unused_imports)]
+use crate::log::{log, logln};
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Program {
     #[serde(flatten)]
-    ast: ast::types::Node<ast::types::Program>,
+    pub ast: parsing::ast::types::Node<parsing::ast::types::Program>,
 }
 
 #[cfg(any(test, feature = "lsp-test-util"))]
@@ -85,16 +138,23 @@ pub use lsp::test_util::copilot_lsp_server;
 pub use lsp::test_util::kcl_lsp_server;
 
 impl Program {
-    pub fn parse(input: &str) -> Result<Program, KclError> {
+    pub fn parse(input: &str) -> Result<(Option<Program>, Vec<CompilationError>), KclError> {
         let module_id = ModuleId::default();
-        let tokens = token::lexer(input, module_id)?;
-        // TODO handle parsing errors properly
-        let ast = parser::parse_tokens(tokens).parse_errs_as_err()?;
+        let tokens = parsing::token::lexer(input, module_id)?;
+        let (ast, errs) = parsing::parse_tokens(tokens).0?;
+
+        Ok((ast.map(|ast| Program { ast }), errs))
+    }
+
+    pub fn parse_no_errs(input: &str) -> Result<Program, KclError> {
+        let module_id = ModuleId::default();
+        let tokens = parsing::token::lexer(input, module_id)?;
+        let ast = parsing::parse_tokens(tokens).parse_errs_as_err()?;
 
         Ok(Program { ast })
     }
 
-    pub fn compute_digest(&mut self) -> ast::types::digest::Digest {
+    pub fn compute_digest(&mut self) -> parsing::ast::digest::Digest {
         self.ast.compute_digest()
     }
 
@@ -116,8 +176,8 @@ impl Program {
     }
 }
 
-impl From<ast::types::Node<ast::types::Program>> for Program {
-    fn from(ast: ast::types::Node<ast::types::Program>) -> Program {
+impl From<parsing::ast::types::Node<parsing::ast::types::Program>> for Program {
+    fn from(ast: parsing::ast::types::Node<parsing::ast::types::Program>) -> Program {
         Self { ast }
     }
 }

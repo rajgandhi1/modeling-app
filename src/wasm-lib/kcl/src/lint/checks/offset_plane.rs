@@ -1,11 +1,13 @@
-use crate::{
-    ast::types::{BinaryPart, Expr, LiteralValue, ObjectExpression, UnaryOperator},
-    executor::SourceRange,
-    lint::rule::{def_finding, Discovered, Finding},
-    walk::Node,
-};
-use anyhow::Result;
 use std::collections::HashMap;
+
+use anyhow::Result;
+
+use crate::{
+    lint::rule::{def_finding, Discovered, Finding},
+    parsing::ast::types::{BinaryPart, Expr, LiteralValue, ObjectExpression, UnaryOperator},
+    walk::Node,
+    SourceRange,
+};
 
 def_finding!(
     Z0003,

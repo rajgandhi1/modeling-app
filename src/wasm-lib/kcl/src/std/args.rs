@@ -1,21 +1,22 @@
-use std::{any::type_name, num::NonZeroU32};
+use std::{any::type_name, collections::HashMap, num::NonZeroU32};
 
 use anyhow::Result;
 use kcmc::{websocket::OkWebSocketResponseData, ModelingCmd};
 use kittycad_modeling_cmds as kcmc;
 
+use super::shapes::PolygonType;
 use crate::{
-    ast::types::TagNode,
     errors::{KclError, KclErrorDetails},
     executor::{
         ExecState, ExecutorContext, ExtrudeSurface, KclValue, Metadata, Sketch, SketchSet, SketchSurface, Solid,
-        SolidSet, SourceRange, TagIdentifier,
+        SolidSet, TagIdentifier,
     },
     kcl_value::KclObjectFields,
+    parsing::ast::types::TagNode,
+    source_range::SourceRange,
     std::{shapes::SketchOrSurface, sketch::FaceTag, FnAsArg},
+    ModuleId,
 };
-
-use super::shapes::PolygonType;
 
 #[derive(Debug, Clone)]
 pub struct Arg {
@@ -44,7 +45,12 @@ impl Arg {
 
 #[derive(Debug, Clone)]
 pub struct Args {
+    /// Positional args.
     pub args: Vec<Arg>,
+    /// Keyword args.
+    pub kw_args: HashMap<String, Arg>,
+    /// Unlabeled keyword args. Currently only the first arg can be unlabeled.
+    pub unlabeled_kw_arg: Option<Arg>,
     pub source_range: SourceRange,
     pub ctx: ExecutorContext,
 }
@@ -53,6 +59,24 @@ impl Args {
     pub fn new(args: Vec<Arg>, source_range: SourceRange, ctx: ExecutorContext) -> Self {
         Self {
             args,
+            kw_args: Default::default(),
+            unlabeled_kw_arg: Default::default(),
+            source_range,
+            ctx,
+        }
+    }
+
+    /// Collect the given keyword arguments.
+    pub fn new_kw(
+        kw_args: HashMap<String, Arg>,
+        unlabeled_kw_arg: Option<Arg>,
+        source_range: SourceRange,
+        ctx: ExecutorContext,
+    ) -> Self {
+        Self {
+            args: Default::default(),
+            kw_args,
+            unlabeled_kw_arg,
             source_range,
             ctx,
         }
@@ -64,6 +88,8 @@ impl Args {
 
         Ok(Self {
             args: Vec::new(),
+            kw_args: Default::default(),
+            unlabeled_kw_arg: Default::default(),
             source_range: SourceRange::default(),
             ctx: ExecutorContext {
                 engine: Arc::new(Box::new(crate::engine::conn_mock::EngineConnection::new().await?)),
@@ -72,6 +98,50 @@ impl Args {
                 settings: Default::default(),
                 context_type: crate::executor::ContextType::Mock,
             },
+        })
+    }
+
+    /// Get a keyword argument. If not set, returns None.
+    pub(crate) fn get_kw_arg_opt<'a, T>(&'a self, label: &str) -> Option<T>
+    where
+        T: FromKclValue<'a>,
+    {
+        self.kw_args.get(label).and_then(|arg| T::from_kcl_val(&arg.value))
+    }
+
+    /// Get a keyword argument. If not set, returns Err.
+    pub(crate) fn get_kw_arg<'a, T>(&'a self, label: &str) -> Result<T, KclError>
+    where
+        T: FromKclValue<'a>,
+    {
+        self.get_kw_arg_opt(label).ok_or_else(|| {
+            KclError::Semantic(KclErrorDetails {
+                source_ranges: vec![self.source_range],
+                message: format!("This function requires a keyword argument '{label}'"),
+            })
+        })
+    }
+
+    /// Get the unlabeled keyword argument. If not set, returns Err.
+    pub(crate) fn get_unlabeled_kw_arg<'a, T>(&'a self, label: &str) -> Result<T, KclError>
+    where
+        T: FromKclValue<'a>,
+    {
+        let Some(ref arg) = self.unlabeled_kw_arg else {
+            return Err(KclError::Semantic(KclErrorDetails {
+                source_ranges: vec![self.source_range],
+                message: format!("This function requires a value for the special unlabeled first parameter, '{label}'"),
+            }));
+        };
+        T::from_kcl_val(&arg.value).ok_or_else(|| {
+            KclError::Semantic(KclErrorDetails {
+                source_ranges: arg.source_ranges(),
+                message: format!(
+                    "Expected a {} but found {}",
+                    type_name::<T>(),
+                    arg.value.human_friendly_type()
+                ),
+            })
         })
     }
 
@@ -577,7 +647,7 @@ where
 {
     fn from_args(args: &'a Args, i: usize) -> Result<Self, KclError> {
         let Some(arg) = args.args.get(i) else { return Ok(None) };
-        if crate::ast::types::KclNone::from_kcl_val(&arg.value).is_some() {
+        if crate::parsing::ast::types::KclNone::from_kcl_val(&arg.value).is_some() {
             return Ok(None);
         }
         let Some(val) = T::from_kcl_val(&arg.value) else {
@@ -1221,7 +1291,6 @@ impl<'a> FromKclValue<'a> for crate::executor::GeoMeta {
         let obj = arg.as_object()?;
         let_field_of!(obj, id);
         let_field_of!(obj, source_range "sourceRange");
-        let source_range = SourceRange(source_range);
         Some(Self {
             id,
             metadata: Metadata { source_range },
@@ -1314,9 +1383,22 @@ impl_from_kcl_for_vec!(super::fillet::EdgeReference);
 impl_from_kcl_for_vec!(ExtrudeSurface);
 impl_from_kcl_for_vec!(Sketch);
 
-impl<'a> FromKclValue<'a> for crate::executor::SourceRange {
+impl<'a> FromKclValue<'a> for SourceRange {
     fn from_kcl_val(arg: &'a KclValue) -> Option<Self> {
-        FromKclValue::from_kcl_val(arg).map(crate::executor::SourceRange)
+        let KclValue::Array { value, meta: _ } = arg else {
+            return None;
+        };
+        if value.len() != 3 {
+            return None;
+        }
+        let v0 = value.first()?;
+        let v1 = value.get(1)?;
+        let v2 = value.get(2)?;
+        Some(SourceRange::new(
+            v0.as_usize()?,
+            v1.as_usize()?,
+            ModuleId::from_usize(v2.as_usize()?),
+        ))
     }
 }
 
@@ -1496,7 +1578,7 @@ impl<'a> FromKclValue<'a> for String {
         Some(value.to_owned())
     }
 }
-impl<'a> FromKclValue<'a> for crate::ast::types::KclNone {
+impl<'a> FromKclValue<'a> for crate::parsing::ast::types::KclNone {
     fn from_kcl_val(arg: &'a KclValue) -> Option<Self> {
         let KclValue::KclNone { value, meta: _ } = arg else {
             return None;

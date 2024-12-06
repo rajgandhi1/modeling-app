@@ -2,7 +2,7 @@
 mod test_examples_some_function {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_mock_example_some_function0() {
-        let program = crate::Program::parse("someFunction()").unwrap();
+        let program = crate::Program::parse_no_errs("someFunction()").unwrap();
         let ctx = crate::executor::ExecutorContext {
             engine: std::sync::Arc::new(Box::new(
                 crate::engine::conn_mock::EngineConnection::new()
@@ -14,7 +14,7 @@ mod test_examples_some_function {
             settings: Default::default(),
             context_type: crate::executor::ContextType::Mock,
         };
-        ctx.run(&program, &mut crate::ExecState::default())
+        ctx.run(program.into(), &mut crate::ExecState::default())
             .await
             .unwrap();
     }
@@ -74,6 +74,10 @@ impl crate::docs::StdLibFn for SomeFunction {
         vec![]
     }
 
+    fn keyword_arguments(&self) -> bool {
+        false
+    }
+
     fn args(&self, inline_subschemas: bool) -> Vec<crate::docs::StdLibFnArg> {
         let mut settings = schemars::gen::SchemaSettings::openapi3();
         settings.inline_subschemas = inline_subschemas;
@@ -91,6 +95,7 @@ impl crate::docs::StdLibFn for SomeFunction {
             type_: "i32".to_string(),
             schema,
             required: true,
+            label_required: true,
         })
     }
 
@@ -107,8 +112,8 @@ impl crate::docs::StdLibFn for SomeFunction {
         code_blocks
             .iter()
             .map(|cb| {
-                let program = crate::Program::parse(cb).unwrap();
-                let mut options: crate::ast::types::FormatOptions = Default::default();
+                let program = crate::Program::parse_no_errs(cb).unwrap();
+                let mut options: crate::parsing::ast::types::FormatOptions = Default::default();
                 options.insert_final_newline = false;
                 program.ast.recast(&options, 0)
             })

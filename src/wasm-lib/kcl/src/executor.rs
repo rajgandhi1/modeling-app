@@ -1,9 +1,6 @@
 //! The executor for the AST.
 
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::{collections::HashSet, sync::Arc};
 
 use anyhow::Result;
 use async_recursion::async_recursion;
@@ -19,20 +16,21 @@ use kittycad_modeling_cmds::length_unit::LengthUnit;
 use parse_display::{Display, FromStr};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use tower_lsp::lsp_types::{Position as LspPosition, Range as LspRange};
 
 type Point2D = kcmc::shared::Point2d<f64>;
 type Point3D = kcmc::shared::Point3d<f64>;
 
 pub use crate::kcl_value::KclValue;
 use crate::{
-    ast::types::{
-        BodyItem, Expr, FunctionExpression, ItemVisibility, KclNone, ModuleId, Node, NodeRef, TagDeclarator, TagNode,
-    },
     engine::{EngineManager, ExecutionKind},
     errors::{KclError, KclErrorDetails},
     fs::{FileManager, FileSystem},
+    parsing::ast::{
+        cache::{get_changed_program, CacheInformation},
+        types::{BodyItem, Expr, FunctionExpression, ItemVisibility, Node, NodeRef, TagDeclarator, TagNode},
+    },
     settings::types::UnitLength,
+    source_range::{ModuleId, SourceRange},
     std::{args::Arg, StdLib},
     ExecError, Program,
 };
@@ -60,9 +58,6 @@ pub struct ExecState {
     pub path_to_source_id: IndexMap<std::path::PathBuf, ModuleId>,
     /// Map from module ID to module info.
     pub module_infos: IndexMap<ModuleId, ModuleInfo>,
-    /// The directory of the current project.  This is used for resolving import
-    /// paths.  If None is given, the current working directory is used.
-    pub project_directory: Option<String>,
 }
 
 impl ExecState {
@@ -193,7 +188,7 @@ impl EnvironmentRef {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
 pub struct Environment {
-    bindings: HashMap<String, KclValue>,
+    bindings: IndexMap<String, KclValue>,
     parent: Option<EnvironmentRef>,
 }
 
@@ -203,7 +198,7 @@ impl Environment {
     pub fn root() -> Self {
         Self {
             // Prelude
-            bindings: HashMap::from([
+            bindings: IndexMap::from([
                 ("ZERO".to_string(), KclValue::from_number(0.0, NO_META)),
                 ("QUARTER_TURN".to_string(), KclValue::from_number(90.0, NO_META)),
                 ("HALF_TURN".to_string(), KclValue::from_number(180.0, NO_META)),
@@ -215,7 +210,7 @@ impl Environment {
 
     pub fn new(parent: EnvironmentRef) -> Self {
         Self {
-            bindings: HashMap::new(),
+            bindings: IndexMap::new(),
             parent: Some(parent),
         }
     }
@@ -735,7 +730,7 @@ pub type MemoryFunction =
     fn(
         s: Vec<Arg>,
         memory: ProgramMemory,
-        expression: crate::ast::types::BoxNode<FunctionExpression>,
+        expression: crate::parsing::ast::types::BoxNode<FunctionExpression>,
         metadata: Vec<Metadata>,
         exec_state: &ExecState,
         ctx: ExecutorContext,
@@ -770,8 +765,8 @@ pub struct Sketch {
     /// The starting path.
     pub start: BasePath,
     /// Tag identifiers that have been declared in this sketch.
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    pub tags: HashMap<String, TagIdentifier>,
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub tags: IndexMap<String, TagIdentifier>,
     /// The original id of the sketch. This stays the same even if the sketch is
     /// is sketched on face etc.
     #[serde(skip)]
@@ -993,108 +988,12 @@ pub enum BodyType {
 /// Info about a module.  Right now, this is pretty minimal.  We hope to cache
 /// modules here in the future.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize, ts_rs::TS, JsonSchema)]
-#[cfg_attr(feature = "pyo3", pyo3::pyclass)]
 #[ts(export)]
 pub struct ModuleInfo {
     /// The ID of the module.
     id: ModuleId,
     /// Absolute path of the module's source file.
     path: std::path::PathBuf,
-}
-
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq, Copy, Clone, ts_rs::TS, JsonSchema, Hash, Eq)]
-#[cfg_attr(feature = "pyo3", pyo3::pyclass)]
-#[ts(export)]
-pub struct SourceRange(#[ts(type = "[number, number]")] pub [usize; 3]);
-
-impl From<[usize; 3]> for SourceRange {
-    fn from(value: [usize; 3]) -> Self {
-        Self(value)
-    }
-}
-
-impl From<&SourceRange> for miette::SourceSpan {
-    fn from(source_range: &SourceRange) -> Self {
-        let length = source_range.end() - source_range.start();
-        let start = miette::SourceOffset::from(source_range.start());
-        Self::new(start, length)
-    }
-}
-
-impl From<SourceRange> for miette::SourceSpan {
-    fn from(source_range: SourceRange) -> Self {
-        Self::from(&source_range)
-    }
-}
-
-impl SourceRange {
-    /// Create a new source range.
-    pub fn new(start: usize, end: usize, module_id: ModuleId) -> Self {
-        Self([start, end, module_id.as_usize()])
-    }
-
-    /// A source range that doesn't correspond to any source code.
-    pub fn synthetic() -> Self {
-        Self::default()
-    }
-
-    /// Get the start of the range.
-    pub fn start(&self) -> usize {
-        self.0[0]
-    }
-
-    /// Get the end of the range.
-    pub fn end(&self) -> usize {
-        self.0[1]
-    }
-
-    /// Get the module ID of the range.
-    pub fn module_id(&self) -> ModuleId {
-        ModuleId::from_usize(self.0[2])
-    }
-
-    /// Check if the range contains a position.
-    pub fn contains(&self, pos: usize) -> bool {
-        pos >= self.start() && pos <= self.end()
-    }
-
-    pub fn start_to_lsp_position(&self, code: &str) -> LspPosition {
-        // Calculate the line and column of the error from the source range.
-        // Lines are zero indexed in vscode so we need to subtract 1.
-        let mut line = code.get(..self.start()).unwrap_or_default().lines().count();
-        if line > 0 {
-            line = line.saturating_sub(1);
-        }
-        let column = code[..self.start()].lines().last().map(|l| l.len()).unwrap_or_default();
-
-        LspPosition {
-            line: line as u32,
-            character: column as u32,
-        }
-    }
-
-    pub fn end_to_lsp_position(&self, code: &str) -> LspPosition {
-        let lines = code.get(..self.end()).unwrap_or_default().lines();
-        if lines.clone().count() == 0 {
-            return LspPosition { line: 0, character: 0 };
-        }
-
-        // Calculate the line and column of the error from the source range.
-        // Lines are zero indexed in vscode so we need to subtract 1.
-        let line = lines.clone().count() - 1;
-        let column = lines.last().map(|l| l.len()).unwrap_or_default();
-
-        LspPosition {
-            line: line as u32,
-            character: column as u32,
-        }
-    }
-
-    pub fn to_lsp_range(&self, code: &str) -> LspRange {
-        let start = self.start_to_lsp_position(code);
-        let end = self.end_to_lsp_position(code);
-        LspRange { start, end }
-    }
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Copy, ts_rs::TS, JsonSchema)]
@@ -1585,7 +1484,8 @@ pub struct ExecutorContext {
 }
 
 /// The executor settings.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
+#[ts(export)]
 pub struct ExecutorSettings {
     /// The unit to use in modeling dimensions.
     pub units: UnitLength,
@@ -1886,18 +1786,21 @@ impl ExecutorContext {
         &self,
         exec_state: &mut ExecState,
         source_range: crate::executor::SourceRange,
-    ) -> Result<()> {
+    ) -> Result<(), KclError> {
         self.engine
             .clear_scene(&mut exec_state.id_generator, source_range)
             .await?;
+
+        // We do not create the planes here as the post hook in wasm will do that
+        // AND if we aren't in wasm it doesn't really matter.
         Ok(())
     }
 
     /// Perform the execution of a program.
     /// You can optionally pass in some initialization memory.
     /// Kurt uses this for partial execution.
-    pub async fn run(&self, program: &Program, exec_state: &mut ExecState) -> Result<(), KclError> {
-        self.run_with_session_data(program, exec_state).await?;
+    pub async fn run(&self, cache_info: CacheInformation, exec_state: &mut ExecState) -> Result<(), KclError> {
+        self.run_with_session_data(cache_info, exec_state).await?;
         Ok(())
     }
 
@@ -1906,9 +1809,27 @@ impl ExecutorContext {
     /// Kurt uses this for partial execution.
     pub async fn run_with_session_data(
         &self,
-        program: &Program,
+        cache_info: CacheInformation,
         exec_state: &mut ExecState,
     ) -> Result<Option<ModelingSessionData>, KclError> {
+        let _stats = crate::log::LogPerfStats::new("Interpretation");
+
+        // Get the program that actually changed from the old and new information.
+        let cache_result = get_changed_program(cache_info.clone(), &self.settings);
+
+        // Check if we don't need to re-execute.
+        let Some(cache_result) = cache_result else {
+            return Ok(None);
+        };
+
+        if cache_result.clear_scene && !self.is_mock() {
+            // We don't do this in mock mode since there is no engine connection
+            // anyways and from the TS side we override memory and don't want to clear it.
+            self.reset_scene(exec_state, Default::default()).await?;
+            // Pop the execution state, since we are starting fresh.
+            *exec_state = Default::default();
+        }
+
         // TODO: Use the top-level file's path.
         exec_state.add_module(std::path::PathBuf::from(""));
         // Before we even start executing the program, set the units.
@@ -1929,7 +1850,7 @@ impl ExecutorContext {
             )
             .await?;
 
-        self.inner_execute(&program.ast, exec_state, crate::executor::BodyType::Root)
+        self.inner_execute(&cache_result.program, exec_state, crate::executor::BodyType::Root)
             .await?;
         let session_data = self.engine.get_session_data();
         Ok(session_data)
@@ -1939,7 +1860,7 @@ impl ExecutorContext {
     #[async_recursion]
     pub(crate) async fn inner_execute<'a>(
         &'a self,
-        program: NodeRef<'a, crate::ast::types::Program>,
+        program: NodeRef<'a, crate::parsing::ast::types::Program>,
         exec_state: &mut ExecState,
         body_type: BodyType,
     ) -> Result<Option<KclValue>, KclError> {
@@ -1957,11 +1878,7 @@ impl ExecutorContext {
                             source_ranges: vec![source_range],
                         }));
                     }
-                    let resolved_path = if let Some(project_dir) = &exec_state.project_directory {
-                        std::path::PathBuf::from(project_dir).join(&path)
-                    } else {
-                        std::path::PathBuf::from(&path)
-                    };
+                    let resolved_path = std::path::PathBuf::from(&path);
                     if exec_state.import_stack.contains(&resolved_path) {
                         return Err(KclError::ImportCycle(KclErrorDetails {
                             message: format!(
@@ -1980,7 +1897,7 @@ impl ExecutorContext {
                     let module_id = exec_state.add_module(resolved_path.clone());
                     let source = self.fs.read_to_string(&resolved_path, source_range).await?;
                     // TODO handle parsing errors properly
-                    let program = crate::parser::parse_str(&source, module_id).parse_errs_as_err()?;
+                    let program = crate::parsing::parse_str(&source, module_id).parse_errs_as_err()?;
                     let (module_memory, module_exports) = {
                         exec_state.import_stack.push(resolved_path.clone());
                         let original_execution = self.engine.replace_execution_kind(ExecutionKind::Isolated);
@@ -2108,7 +2025,7 @@ impl ExecutorContext {
                     // True here tells the engine to flush all the end commands as well like fillets
                     // and chamfers where the engine would otherwise eat the ID of the segments.
                     true,
-                    SourceRange([program.end, program.end, program.module_id.as_usize()]),
+                    SourceRange::new(program.end, program.end, program.module_id),
                 )
                 .await?;
         }
@@ -2144,6 +2061,7 @@ impl ExecutorContext {
                 }
             }
             Expr::CallExpression(call_expression) => call_expression.execute(exec_state, self).await?,
+            Expr::CallExpressionKw(call_expression) => call_expression.execute(exec_state, self).await?,
             Expr::PipeExpression(pipe_expression) => pipe_expression.get_result(exec_state, self).await?,
             Expr::PipeSubstitution(pipe_substitution) => match statement_kind {
                 StatementKind::Declaration { name } => {
@@ -2196,7 +2114,7 @@ impl ExecutorContext {
         program: &Program,
         exec_state: &mut ExecState,
     ) -> std::result::Result<TakeSnapshot, ExecError> {
-        self.run(program, exec_state).await?;
+        self.run(program.clone().into(), exec_state).await?;
 
         // Zoom to fit.
         self.engine
@@ -2269,18 +2187,12 @@ fn assign_args_to_params(
             fn_memory.add(&param.identifier.name, arg.value.clone(), (&param.identifier).into())?;
         } else {
             // Argument was not provided.
-            if param.optional {
+            if let Some(ref default_val) = param.default_value {
                 // If the corresponding parameter is optional,
                 // then it's fine, the user doesn't need to supply it.
-                let none = Node {
-                    inner: KclNone::new(),
-                    start: param.identifier.start,
-                    end: param.identifier.end,
-                    module_id: param.identifier.module_id,
-                };
                 fn_memory.add(
                     &param.identifier.name,
-                    KclValue::from(&none),
+                    default_val.clone().into(),
                     (&param.identifier).into(),
                 )?;
             } else {
@@ -2335,10 +2247,10 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     use super::*;
-    use crate::ast::types::{Identifier, Node, Parameter};
+    use crate::parsing::ast::types::{DefaultParamVal, Identifier, Node, Parameter};
 
     pub async fn parse_execute(code: &str) -> Result<ProgramMemory> {
-        let program = Program::parse(code)?;
+        let program = Program::parse_no_errs(code)?;
 
         let ctx = ExecutorContext {
             engine: Arc::new(Box::new(crate::engine::conn_mock::EngineConnection::new().await?)),
@@ -2348,7 +2260,7 @@ mod tests {
             context_type: ContextType::Mock,
         };
         let mut exec_state = ExecState::default();
-        ctx.run(&program, &mut exec_state).await?;
+        ctx.run(program.into(), &mut exec_state).await?;
 
         Ok(exec_state.memory)
     }
@@ -2713,7 +2625,10 @@ const answer = returnX()"#;
             err,
             KclError::UndefinedValue(KclErrorDetails {
                 message: "memory item key `x` is not defined".to_owned(),
-                source_ranges: vec![SourceRange([64, 65, 0]), SourceRange([97, 106, 0])],
+                source_ranges: vec![
+                    SourceRange::new(64, 65, ModuleId::default()),
+                    SourceRange::new(97, 106, ModuleId::default())
+                ],
             }),
         );
     }
@@ -2748,7 +2663,7 @@ let shape = layer() |> patternTransform(10, transform, %)
             err,
             KclError::UndefinedValue(KclErrorDetails {
                 message: "memory item key `x` is not defined".to_owned(),
-                source_ranges: vec![SourceRange([80, 81, 0])],
+                source_ranges: vec![SourceRange::new(80, 81, ModuleId::default())],
             }),
         );
     }
@@ -2844,7 +2759,7 @@ let notNull = !myNull
             parse_execute(code1).await.unwrap_err().downcast::<KclError>().unwrap(),
             KclError::Semantic(KclErrorDetails {
                 message: "Cannot apply unary operator ! to non-boolean value: number".to_owned(),
-                source_ranges: vec![SourceRange([56, 63, 0])],
+                source_ranges: vec![SourceRange::new(56, 63, ModuleId::default())],
             })
         );
 
@@ -2853,7 +2768,7 @@ let notNull = !myNull
             parse_execute(code2).await.unwrap_err().downcast::<KclError>().unwrap(),
             KclError::Semantic(KclErrorDetails {
                 message: "Cannot apply unary operator ! to non-boolean value: number".to_owned(),
-                source_ranges: vec![SourceRange([14, 16, 0])],
+                source_ranges: vec![SourceRange::new(14, 16, ModuleId::default())],
             })
         );
 
@@ -2864,7 +2779,7 @@ let notEmptyString = !""
             parse_execute(code3).await.unwrap_err().downcast::<KclError>().unwrap(),
             KclError::Semantic(KclErrorDetails {
                 message: "Cannot apply unary operator ! to non-boolean value: string (text)".to_owned(),
-                source_ranges: vec![SourceRange([22, 25, 0])],
+                source_ranges: vec![SourceRange::new(22, 25, ModuleId::default())],
             })
         );
 
@@ -2876,7 +2791,7 @@ let notMember = !obj.a
             parse_execute(code4).await.unwrap_err().downcast::<KclError>().unwrap(),
             KclError::Semantic(KclErrorDetails {
                 message: "Cannot apply unary operator ! to non-boolean value: number".to_owned(),
-                source_ranges: vec![SourceRange([36, 42, 0])],
+                source_ranges: vec![SourceRange::new(36, 42, ModuleId::default())],
             })
         );
 
@@ -2887,7 +2802,7 @@ let notArray = !a";
             parse_execute(code5).await.unwrap_err().downcast::<KclError>().unwrap(),
             KclError::Semantic(KclErrorDetails {
                 message: "Cannot apply unary operator ! to non-boolean value: array (list)".to_owned(),
-                source_ranges: vec![SourceRange([27, 29, 0])],
+                source_ranges: vec![SourceRange::new(27, 29, ModuleId::default())],
             })
         );
 
@@ -2898,7 +2813,7 @@ let notObject = !x";
             parse_execute(code6).await.unwrap_err().downcast::<KclError>().unwrap(),
             KclError::Semantic(KclErrorDetails {
                 message: "Cannot apply unary operator ! to non-boolean value: object".to_owned(),
-                source_ranges: vec![SourceRange([28, 30, 0])],
+                source_ranges: vec![SourceRange::new(28, 30, ModuleId::default())],
             })
         );
 
@@ -2951,7 +2866,7 @@ let notTagIdentifier = !myTag";
             parse_execute(code10).await.unwrap_err().downcast::<KclError>().unwrap(),
             KclError::Syntax(KclErrorDetails {
                 message: "Unexpected token: !".to_owned(),
-                source_ranges: vec![SourceRange([14, 15, 0])],
+                source_ranges: vec![SourceRange::new(14, 15, ModuleId::default())],
             })
         );
 
@@ -2964,7 +2879,7 @@ let notPipeSub = 1 |> identity(!%))";
             parse_execute(code11).await.unwrap_err().downcast::<KclError>().unwrap(),
             KclError::Syntax(KclErrorDetails {
                 message: "Unexpected token: |>".to_owned(),
-                source_ranges: vec![SourceRange([54, 56, 0])],
+                source_ranges: vec![SourceRange::new(54, 56, ModuleId::default())],
             })
         );
 
@@ -3008,10 +2923,10 @@ test([0, 0])
 "#;
         let result = parse_execute(ast).await;
         assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err().to_string(),
-            r#"undefined value: KclErrorDetails { source_ranges: [SourceRange([10, 34, 0])], message: "Result of user-defined function test is undefined" }"#.to_owned()
-        );
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Result of user-defined function test is undefined"),);
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -3092,7 +3007,8 @@ let w = f() + f()
             Parameter {
                 identifier: ident(s),
                 type_: None,
-                optional: true,
+                default_value: Some(DefaultParamVal::none()),
+                labeled: true,
                 digest: None,
             }
         }
@@ -3100,7 +3016,8 @@ let w = f() + f()
             Parameter {
                 identifier: ident(s),
                 type_: None,
-                optional: false,
+                default_value: None,
+                labeled: true,
                 digest: None,
             }
         }
@@ -3127,7 +3044,7 @@ let w = f() + f()
                 vec![req_param("x")],
                 vec![],
                 Err(KclError::Semantic(KclErrorDetails {
-                    source_ranges: vec![SourceRange([0, 0, 0])],
+                    source_ranges: vec![SourceRange::default()],
                     message: "Expected 1 arguments, got 0".to_owned(),
                 })),
             ),
@@ -3135,17 +3052,14 @@ let w = f() + f()
                 "all params optional, none given, should be OK",
                 vec![opt_param("x")],
                 vec![],
-                Ok(additional_program_memory(&[(
-                    "x".to_owned(),
-                    KclValue::from(&KclNone::default()),
-                )])),
+                Ok(additional_program_memory(&[("x".to_owned(), KclValue::none())])),
             ),
             (
                 "mixed params, too few given",
                 vec![req_param("x"), opt_param("y")],
                 vec![],
                 Err(KclError::Semantic(KclErrorDetails {
-                    source_ranges: vec![SourceRange([0, 0, 0])],
+                    source_ranges: vec![SourceRange::default()],
                     message: "Expected 1-2 arguments, got 0".to_owned(),
                 })),
             ),
@@ -3155,7 +3069,7 @@ let w = f() + f()
                 vec![mem(1)],
                 Ok(additional_program_memory(&[
                     ("x".to_owned(), mem(1)),
-                    ("y".to_owned(), KclValue::from(&KclNone::default())),
+                    ("y".to_owned(), KclValue::none()),
                 ])),
             ),
             (
@@ -3172,7 +3086,7 @@ let w = f() + f()
                 vec![req_param("x"), opt_param("y")],
                 vec![mem(1), mem(2), mem(3)],
                 Err(KclError::Semantic(KclErrorDetails {
-                    source_ranges: vec![SourceRange([0, 0, 0])],
+                    source_ranges: vec![SourceRange::default()],
                     message: "Expected 1-2 arguments, got 3".to_owned(),
                 })),
             ),
@@ -3181,7 +3095,7 @@ let w = f() + f()
             let func_expr = &Node::no_src(FunctionExpression {
                 params,
                 body: Node {
-                    inner: crate::ast::types::Program {
+                    inner: crate::parsing::ast::types::Program {
                         body: Vec::new(),
                         non_code_meta: Default::default(),
                         shebang: None,

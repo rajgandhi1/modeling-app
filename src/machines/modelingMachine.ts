@@ -1,9 +1,11 @@
 import {
   PathToNode,
+  ProgramMemory,
   VariableDeclaration,
   VariableDeclarator,
   parse,
   recast,
+  resultIsOk,
 } from 'lang/wasm'
 import {
   Axis,
@@ -44,9 +46,14 @@ import {
   addOffsetPlane,
   deleteFromSelection,
   extrudeSketch,
+  loftSketches,
   revolveSketch,
 } from 'lang/modifyAst'
-import { applyFilletToSelection } from 'lang/modifyAst/addFillet'
+import {
+  applyEdgeTreatmentToSelection,
+  EdgeTreatmentType,
+  FilletParameters,
+} from 'lang/modifyAst/addEdgeTreatment'
 import { getNodeFromPath } from '../lang/queryAst'
 import {
   applyConstraintEqualAngle,
@@ -252,6 +259,7 @@ export type ModelingMachineEvent =
   | { type: 'Export'; data: ModelingCommandSchema['Export'] }
   | { type: 'Make'; data: ModelingCommandSchema['Make'] }
   | { type: 'Extrude'; data?: ModelingCommandSchema['Extrude'] }
+  | { type: 'Loft'; data?: ModelingCommandSchema['Loft'] }
   | { type: 'Revolve'; data?: ModelingCommandSchema['Revolve'] }
   | { type: 'Fillet'; data?: ModelingCommandSchema['Fillet'] }
   | { type: 'Offset plane'; data: ModelingCommandSchema['Offset plane'] }
@@ -383,7 +391,8 @@ export const modelingMachine = setup({
   guards: {
     'Selection is on face': () => false,
     'has valid sweep selection': () => false,
-    'has valid fillet selection': () => false,
+    'has valid loft selection': () => false,
+    'has valid edge treatment selection': () => false,
     'Has exportable geometry': () => false,
     'has valid selection for deletion': () => false,
     'has made first point': ({ context }) => {
@@ -535,8 +544,11 @@ export const modelingMachine = setup({
       if (event.type !== 'Convert to variable') return false
       if (!event.data) return false
       const ast = parse(recast(kclManager.ast))
-      if (err(ast)) return false
-      const isSafeRetVal = isNodeSafeToReplacePath(ast, event.data.pathToNode)
+      if (err(ast) || !ast.program || ast.errors.length > 0) return false
+      const isSafeRetVal = isNodeSafeToReplacePath(
+        ast.program,
+        event.data.pathToNode
+      )
       if (err(isSafeRetVal)) return false
       return isSafeRetVal.isSafe
     },
@@ -719,9 +731,9 @@ export const modelingMachine = setup({
 
         const testExecute = await executeAst({
           ast: modifiedAst,
-          idGenerator: kclManager.execState.idGenerator,
-          useFakeExecutor: true,
           engineCommandManager,
+          // We make sure to send an empty program memory to denote we mean mock mode.
+          programMemoryOverride: ProgramMemory.empty(),
         })
         if (testExecute.errors.length) {
           toast.error('Unable to delete part')
@@ -739,14 +751,19 @@ export const modelingMachine = setup({
       // Extract inputs
       const ast = kclManager.ast
       const { selection, radius } = event.data
+      const parameters: FilletParameters = {
+        type: EdgeTreatmentType.Fillet,
+        radius,
+      }
 
       // Apply fillet to selection
-      const applyFilletToSelectionResult = applyFilletToSelection(
+      const applyEdgeTreatmentToSelectionResult = applyEdgeTreatmentToSelection(
         ast,
         selection,
-        radius
+        parameters
       )
-      if (err(applyFilletToSelectionResult)) return applyFilletToSelectionResult
+      if (err(applyEdgeTreatmentToSelectionResult))
+        return applyEdgeTreatmentToSelectionResult
 
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
       codeManager.updateEditorWithAstAndWriteToFile(kclManager.ast)
@@ -1320,9 +1337,12 @@ export const modelingMachine = setup({
           return
         }
 
+        const recastAst = parse(recast(modifiedAst))
+        if (err(recastAst) || !resultIsOk(recastAst)) return
+
         const updatedAst = await sceneEntitiesManager.updateAstAndRejigSketch(
           sketchDetails?.sketchPathToNode || [],
-          parse(recast(modifiedAst)),
+          recastAst.program,
           sketchDetails.zAxis,
           sketchDetails.yAxis,
           sketchDetails.origin
@@ -1525,6 +1545,50 @@ export const modelingMachine = setup({
         }
       }
     ),
+    loftAstMod: fromPromise(
+      async ({
+        input,
+      }: {
+        input: ModelingCommandSchema['Loft'] | undefined
+      }) => {
+        if (!input) return new Error('No input provided')
+        // Extract inputs
+        const ast = kclManager.ast
+        const { selection } = input
+        const declarators = selection.graphSelections.flatMap((s) => {
+          const path = getNodePathFromSourceRange(ast, s?.codeRef.range)
+          const nodeFromPath = getNodeFromPath<VariableDeclarator>(
+            ast,
+            path,
+            'VariableDeclarator'
+          )
+          return err(nodeFromPath) ? [] : nodeFromPath.node
+        })
+
+        // TODO: add better validation on selection
+        if (!(declarators && declarators.length > 1)) {
+          trap('Not enough sketches selected')
+        }
+
+        // Perform the loft
+        const loftSketchesRes = loftSketches(ast, declarators)
+        const updateAstResult = await kclManager.updateAst(
+          loftSketchesRes.modifiedAst,
+          true,
+          {
+            focusPath: [loftSketchesRes.pathToNode],
+          }
+        )
+
+        await codeManager.updateEditorWithAstAndWriteToFile(
+          updateAstResult.newAst
+        )
+
+        if (updateAstResult?.selections) {
+          editorManager.selectRange(updateAstResult?.selections)
+        }
+      }
+    ),
   },
   // end services
 }).createMachine({
@@ -1561,9 +1625,14 @@ export const modelingMachine = setup({
           reenter: false,
         },
 
+        Loft: {
+          target: 'Applying loft',
+          reenter: true,
+        },
+
         Fillet: {
           target: 'idle',
-          guard: 'has valid fillet selection', // TODO: fix selections
+          guard: 'has valid edge treatment selection',
           actions: ['AST fillet'],
           reenter: false,
         },
@@ -2303,6 +2372,19 @@ export const modelingMachine = setup({
         id: 'offsetPlaneAstMod',
         input: ({ event }) => {
           if (event.type !== 'Offset plane') return undefined
+          return event.data
+        },
+        onDone: ['idle'],
+        onError: ['idle'],
+      },
+    },
+
+    'Applying loft': {
+      invoke: {
+        src: 'loftAstMod',
+        id: 'loftAstMod',
+        input: ({ event }) => {
+          if (event.type !== 'Loft') return undefined
           return event.data
         },
         onDone: ['idle'],

@@ -5,10 +5,10 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ast::types::{FunctionExpression, KclNone, TagDeclarator, TagNode},
     errors::KclErrorDetails,
     exec::{ProgramMemory, Sketch},
     executor::{Face, ImportedGeometry, MemoryFunction, Metadata, Plane, SketchSet, Solid, SolidSet, TagIdentifier},
+    parsing::ast::types::{FunctionExpression, KclNone, LiteralValue, TagDeclarator, TagNode},
     std::{args::Arg, FnAsArg},
     ExecState, ExecutorContext, KclError, SourceRange,
 };
@@ -56,7 +56,7 @@ pub enum KclValue {
         meta: Vec<Metadata>,
     },
     TagIdentifier(Box<TagIdentifier>),
-    TagDeclarator(crate::ast::types::BoxNode<TagDeclarator>),
+    TagDeclarator(crate::parsing::ast::types::BoxNode<TagDeclarator>),
     Plane(Box<Plane>),
     Face(Box<Face>),
     Sketch {
@@ -74,7 +74,8 @@ pub enum KclValue {
     Function {
         #[serde(skip)]
         func: Option<MemoryFunction>,
-        expression: crate::ast::types::BoxNode<FunctionExpression>,
+        #[schemars(skip)]
+        expression: crate::parsing::ast::types::BoxNode<FunctionExpression>,
         memory: Box<ProgramMemory>,
         #[serde(rename = "__meta")]
         meta: Vec<Metadata>,
@@ -122,7 +123,7 @@ impl From<Vec<Box<Solid>>> for KclValue {
 impl From<KclValue> for Vec<SourceRange> {
     fn from(item: KclValue) -> Self {
         match item {
-            KclValue::TagDeclarator(t) => vec![SourceRange([t.start, t.end, t.module_id.0 as usize])],
+            KclValue::TagDeclarator(t) => vec![SourceRange::new(t.start, t.end, t.module_id)],
             KclValue::TagIdentifier(t) => to_vec_sr(&t.meta),
             KclValue::Solid(e) => to_vec_sr(&e.meta),
             KclValue::Solids { value } => value.iter().flat_map(|eg| to_vec_sr(&eg.meta)).collect(),
@@ -151,7 +152,7 @@ fn to_vec_sr(meta: &[Metadata]) -> Vec<SourceRange> {
 impl From<&KclValue> for Vec<SourceRange> {
     fn from(item: &KclValue) -> Self {
         match item {
-            KclValue::TagDeclarator(t) => vec![SourceRange([t.start, t.end, t.module_id.0 as usize])],
+            KclValue::TagDeclarator(t) => vec![SourceRange::new(t.start, t.end, t.module_id)],
             KclValue::TagIdentifier(t) => to_vec_sr(&t.meta),
             KclValue::Solid(e) => to_vec_sr(&e.meta),
             KclValue::Solids { value } => value.iter().flat_map(|eg| to_vec_sr(&eg.meta)).collect(),
@@ -220,6 +221,14 @@ impl KclValue {
         }
     }
 
+    #[allow(unused)]
+    pub(crate) fn none() -> Self {
+        Self::KclNone {
+            value: Default::default(),
+            meta: Default::default(),
+        }
+    }
+
     /// Human readable type name used in error messages.  Should not be relied
     /// on for program logic.
     pub(crate) fn human_friendly_type(&self) -> &'static str {
@@ -242,6 +251,14 @@ impl KclValue {
             KclValue::Array { .. } => "array (list)",
             KclValue::Object { .. } => "object",
             KclValue::KclNone { .. } => "None",
+        }
+    }
+
+    pub(crate) fn from_literal(literal: LiteralValue, meta: Vec<Metadata>) -> Self {
+        match literal {
+            LiteralValue::Number(value) => KclValue::Number { value, meta },
+            LiteralValue::String(value) => KclValue::String { value, meta },
+            LiteralValue::Bool(value) => KclValue::Bool { value, meta },
         }
     }
 
