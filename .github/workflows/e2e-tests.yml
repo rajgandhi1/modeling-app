@@ -1,7 +1,7 @@
 name: E2E Tests
 on:
   push:
-    branches: [ main ]
+    branches: [ main, pierremtb/move-tests-to-electron ]
   pull_request:
     branches: [ main ]
 
