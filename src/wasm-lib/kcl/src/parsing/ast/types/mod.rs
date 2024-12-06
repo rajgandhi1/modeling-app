@@ -9,7 +9,6 @@ use std::{
 
 use anyhow::Result;
 use async_recursion::async_recursion;
-use databake::*;
 use parse_display::{Display, FromStr};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -30,7 +29,6 @@ use crate::{
     executor::{ExecState, ExecutorContext, KclValue, Metadata, TagIdentifier},
     parsing::PIPE_OPERATOR,
     source_range::{ModuleId, SourceRange},
-    std::kcl_stdlib::KclStdLibFn,
 };
 
 mod condition;
@@ -42,8 +40,7 @@ pub enum Definition<'a> {
     Import(NodeRef<'a, ImportStatement>),
 }
 
-#[derive(Debug, Default, Clone, Deserialize, Serialize, PartialEq, Eq, ts_rs::TS, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Default, Clone, Deserialize, Serialize, PartialEq, Eq, ts_rs::TS)]
 #[ts(export)]
 #[serde(rename_all = "camelCase")]
 pub struct Node<T> {
@@ -169,8 +166,7 @@ pub type NodeList<T> = Vec<Node<T>>;
 pub type NodeRef<'a, T> = &'a Node<T>;
 
 /// A KCL program top level, or function body.
-#[derive(Debug, Default, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Default, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
 #[ts(export)]
 #[serde(rename_all = "camelCase")]
 pub struct Program {
@@ -535,8 +531,7 @@ impl Program {
 /// ```python,no_run
 /// #!/usr/bin/env python
 /// ```
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Deserialize, Serialize, ts_rs::TS, JsonSchema, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Deserialize, Serialize, ts_rs::TS, JsonSchema)]
 #[ts(export)]
 pub struct Shebang {
     pub content: String,
@@ -548,8 +543,7 @@ impl Shebang {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
 #[ts(export)]
 #[serde(tag = "type")]
 pub enum BodyItem {
@@ -592,8 +586,7 @@ impl From<&BodyItem> for SourceRange {
 }
 
 /// An expression can be evaluated to yield a single KCL value.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
 #[ts(export)]
 #[serde(tag = "type")]
 pub enum Expr {
@@ -819,8 +812,7 @@ impl From<&Expr> for SourceRange {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
 #[ts(export)]
 #[serde(tag = "type")]
 pub enum BinaryPart {
@@ -951,8 +943,7 @@ impl BinaryPart {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
 #[ts(export)]
 #[serde(tag = "type")]
 pub struct NonCodeNode {
@@ -1013,8 +1004,7 @@ impl NonCodeNode {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
 #[ts(export)]
 #[serde(rename_all = "camelCase")]
 pub enum CommentStyle {
@@ -1024,8 +1014,7 @@ pub enum CommentStyle {
     Block,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
 #[ts(export)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum NonCodeValue {
@@ -1062,8 +1051,7 @@ pub enum NonCodeValue {
     NewLine,
 }
 
-#[derive(Debug, Default, Clone, Serialize, PartialEq, ts_rs::TS, JsonSchema, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Default, Clone, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
 #[ts(export)]
 #[serde(rename_all = "camelCase")]
 pub struct NonCodeMeta {
@@ -1131,8 +1119,7 @@ impl NonCodeMeta {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
 #[ts(export)]
 #[serde(tag = "type")]
 pub struct ImportItem {
@@ -1184,8 +1171,7 @@ impl ImportItem {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
 #[ts(export)]
 #[serde(tag = "type")]
 pub struct ImportStatement {
@@ -1227,8 +1213,7 @@ impl ImportStatement {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
 #[ts(export)]
 #[serde(tag = "type")]
 pub struct ExpressionStatement {
@@ -1239,8 +1224,7 @@ pub struct ExpressionStatement {
     pub digest: Option<Digest>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
 #[ts(export)]
 #[serde(tag = "type")]
 pub struct CallExpression {
@@ -1252,8 +1236,7 @@ pub struct CallExpression {
     pub digest: Option<Digest>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
 #[ts(export)]
 #[serde(tag = "type")]
 pub struct CallExpressionKw {
@@ -1267,8 +1250,7 @@ pub struct CallExpressionKw {
     pub digest: Option<Digest>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
 #[ts(export)]
 #[serde(tag = "type")]
 pub struct LabeledArg {
@@ -1454,11 +1436,6 @@ pub enum Function {
         /// The function.
         func: Box<dyn StdLibFn>,
     },
-    /// A stdlib function written in KCL.
-    StdLibKcl {
-        /// The function.
-        func: Box<dyn KclStdLibFn>,
-    },
     /// A function that is defined in memory.
     #[default]
     InMemory,
@@ -1474,10 +1451,7 @@ impl PartialEq for Function {
     }
 }
 
-#[derive(
-    Debug, Default, Clone, Copy, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, FromStr, Display, Bake,
-)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Default, Clone, Copy, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, FromStr, Display)]
 #[ts(export)]
 #[serde(rename_all = "snake_case")]
 #[display(style = "snake_case")]
@@ -1493,8 +1467,7 @@ impl ItemVisibility {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
 #[ts(export)]
 #[serde(tag = "type")]
 pub struct VariableDeclaration {
@@ -1698,8 +1671,7 @@ impl VariableDeclaration {
     }
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, FromStr, Display, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, FromStr, Display)]
 #[ts(export)]
 #[serde(rename_all = "snake_case")]
 #[display(style = "snake_case")]
@@ -1739,8 +1711,7 @@ impl VariableKind {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
 #[ts(export)]
 #[serde(tag = "type")]
 pub struct VariableDeclarator {
@@ -1768,8 +1739,7 @@ impl VariableDeclarator {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
 #[ts(export)]
 #[serde(tag = "type")]
 pub struct Literal {
@@ -1825,8 +1795,7 @@ impl From<&BoxNode<Literal>> for KclValue {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, Bake, Eq)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, Eq)]
 #[ts(export)]
 #[serde(tag = "type")]
 pub struct Identifier {
@@ -1863,8 +1832,7 @@ impl Identifier {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, Bake, Eq)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, Eq)]
 #[ts(export)]
 #[serde(tag = "type")]
 pub struct TagDeclarator {
@@ -1971,8 +1939,7 @@ impl TagDeclarator {
     }
 }
 
-#[derive(Debug, Default, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Default, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
 #[ts(export)]
 #[serde(tag = "type")]
 pub struct PipeSubstitution {
@@ -1993,8 +1960,7 @@ impl From<Node<PipeSubstitution>> for Expr {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
 #[ts(export)]
 #[serde(rename_all = "camelCase", tag = "type")]
 pub struct ArrayExpression {
@@ -2065,8 +2031,7 @@ impl ArrayExpression {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
 #[ts(export)]
 #[serde(rename_all = "camelCase", tag = "type")]
 pub struct ArrayRangeExpression {
@@ -2130,8 +2095,7 @@ impl ArrayRangeExpression {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
 #[ts(export)]
 #[serde(rename_all = "camelCase", tag = "type")]
 pub struct ObjectExpression {
@@ -2196,8 +2160,7 @@ impl ObjectExpression {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
 #[ts(export)]
 #[serde(tag = "type")]
 pub struct ObjectProperty {
@@ -2241,8 +2204,7 @@ impl ObjectProperty {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
 #[ts(export)]
 #[serde(tag = "type")]
 pub enum MemberObject {
@@ -2288,8 +2250,7 @@ impl From<&MemberObject> for SourceRange {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
 #[ts(export)]
 #[serde(tag = "type")]
 pub enum LiteralIdentifier {
@@ -2325,8 +2286,7 @@ impl From<&LiteralIdentifier> for SourceRange {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
 #[ts(export)]
 #[serde(tag = "type")]
 pub struct MemberExpression {
@@ -2384,8 +2344,7 @@ pub struct ObjectKeyInfo {
     pub computed: bool,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
 #[ts(export)]
 #[serde(tag = "type")]
 pub struct BinaryExpression {
@@ -2452,8 +2411,7 @@ impl BinaryExpression {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, FromStr, Display, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, FromStr, Display)]
 #[ts(export)]
 #[serde(rename_all = "snake_case")]
 #[display(style = "snake_case")]
@@ -2565,8 +2523,7 @@ impl BinaryOperator {
         }
     }
 }
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
 #[ts(export)]
 #[serde(tag = "type")]
 pub struct UnaryExpression {
@@ -2611,8 +2568,7 @@ impl UnaryExpression {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, FromStr, Display, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, FromStr, Display)]
 #[ts(export)]
 #[serde(rename_all = "snake_case")]
 #[display(style = "snake_case")]
@@ -2636,8 +2592,7 @@ impl UnaryOperator {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
 #[ts(export)]
 #[serde(rename_all = "camelCase", tag = "type")]
 pub struct PipeExpression {
@@ -2716,8 +2671,7 @@ impl PipeExpression {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, JsonSchema, Bake, FromStr, Display)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, JsonSchema, FromStr, Display)]
 #[serde(tag = "type")]
 #[display(style = "snake_case")]
 pub enum FnArgPrimitive {
@@ -2753,8 +2707,7 @@ impl FnArgPrimitive {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, JsonSchema, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(tag = "type")]
 pub enum FnArgType {
     /// A primitive type.
@@ -2767,9 +2720,38 @@ pub enum FnArgType {
     },
 }
 
+/// Default value for a parameter of a KCL function.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
+#[ts(export)]
+#[serde(tag = "type")]
+#[allow(clippy::large_enum_variant)]
+pub enum DefaultParamVal {
+    KclNone(KclNone),
+    Literal(Literal),
+}
+
+// TODO: This should actually take metadata.
+impl From<DefaultParamVal> for KclValue {
+    fn from(v: DefaultParamVal) -> Self {
+        match v {
+            DefaultParamVal::KclNone(kcl_none) => Self::KclNone {
+                value: kcl_none,
+                meta: Default::default(),
+            },
+            DefaultParamVal::Literal(literal) => Self::from_literal(literal.value, Vec::new()),
+        }
+    }
+}
+
+impl DefaultParamVal {
+    /// KCL none.
+    pub(crate) fn none() -> Self {
+        Self::KclNone(KclNone::default())
+    }
+}
+
 /// Parameter of a KCL function.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, ts_rs::TS, JsonSchema, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
 #[ts(export)]
 #[serde(tag = "type")]
 pub struct Parameter {
@@ -2780,15 +2762,36 @@ pub struct Parameter {
     #[serde(skip)]
     pub type_: Option<FnArgType>,
     /// Is the parameter optional?
-    pub optional: bool,
+    /// If so, what is its default value?
+    /// If this is None, then the parameter is required.
+    /// Defaults to None.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_value: Option<DefaultParamVal>,
+    /// Functions may declare at most one parameter without label, prefixed by '@', and it must be the first parameter.
+    #[serde(default = "return_true", skip_serializing_if = "is_true")]
+    pub labeled: bool,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub digest: Option<Digest>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+impl Parameter {
+    /// Is the parameter optional?
+    pub fn optional(&self) -> bool {
+        self.default_value.is_some()
+    }
+}
+
+fn is_true(b: &bool) -> bool {
+    *b
+}
+
+fn return_true() -> bool {
+    true
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
 #[ts(export)]
 #[serde(tag = "type")]
 pub struct FunctionExpression {
@@ -2832,13 +2835,13 @@ impl FunctionExpression {
         } = self;
         let mut found_optional = false;
         for param in params {
-            if param.optional {
+            if param.optional() {
                 found_optional = true;
             } else if found_optional {
                 return Err(RequiredParamAfterOptionalParam(Box::new(param.clone())));
             }
         }
-        let boundary = self.params.partition_point(|param| !param.optional);
+        let boundary = self.params.partition_point(|param| !param.optional());
         // SAFETY: split_at panics if the boundary is greater than the length.
         Ok(self.params.split_at(boundary))
     }
@@ -2849,7 +2852,7 @@ impl FunctionExpression {
         let end_of_required_params = self
             .params
             .iter()
-            .position(|param| param.optional)
+            .position(|param| param.optional())
             // If there's no optional params, then all the params are required params.
             .unwrap_or(self.params.len());
         &self.params[..end_of_required_params]
@@ -2874,8 +2877,7 @@ impl FunctionExpression {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema, Bake)]
-#[databake(path = kcl_lib::ast::types)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ts_rs::TS, JsonSchema)]
 #[ts(export)]
 #[serde(tag = "type")]
 pub struct ReturnStatement {
@@ -3307,8 +3309,9 @@ const cylinder = startSketchOn('-XZ')
                             module_id,
                         ),
                         type_: Some(FnArgType::Primitive(FnArgPrimitive::Number)),
-                        optional: false,
-                        digest: None
+                        default_value: None,
+                        labeled: true,
+                        digest: None,
                     },
                     Parameter {
                         identifier: Node::new(
@@ -3321,7 +3324,8 @@ const cylinder = startSketchOn('-XZ')
                             module_id,
                         ),
                         type_: Some(FnArgType::Array(FnArgPrimitive::String)),
-                        optional: false,
+                        default_value: None,
+                        labeled: true,
                         digest: None
                     },
                     Parameter {
@@ -3335,7 +3339,8 @@ const cylinder = startSketchOn('-XZ')
                             module_id,
                         ),
                         type_: Some(FnArgType::Primitive(FnArgPrimitive::String)),
-                        optional: true,
+                        labeled: true,
+                        default_value: Some(DefaultParamVal::none()),
                         digest: None
                     }
                 ]
@@ -3377,7 +3382,8 @@ const cylinder = startSketchOn('-XZ')
                             module_id,
                         ),
                         type_: Some(FnArgType::Primitive(FnArgPrimitive::Number)),
-                        optional: false,
+                        default_value: None,
+                        labeled: true,
                         digest: None
                     },
                     Parameter {
@@ -3391,7 +3397,8 @@ const cylinder = startSketchOn('-XZ')
                             module_id,
                         ),
                         type_: Some(FnArgType::Array(FnArgPrimitive::String)),
-                        optional: false,
+                        default_value: None,
+                        labeled: true,
                         digest: None
                     },
                     Parameter {
@@ -3405,7 +3412,8 @@ const cylinder = startSketchOn('-XZ')
                             module_id,
                         ),
                         type_: Some(FnArgType::Primitive(FnArgPrimitive::String)),
-                        optional: true,
+                        labeled: true,
+                        default_value: Some(DefaultParamVal::none()),
                         digest: None
                     }
                 ]
@@ -3441,7 +3449,8 @@ const cylinder = startSketchOn('-XZ')
                             digest: None,
                         }),
                         type_: None,
-                        optional: false,
+                        default_value: None,
+                        labeled: true,
                         digest: None,
                     }],
                     body: Node {
@@ -3469,7 +3478,8 @@ const cylinder = startSketchOn('-XZ')
                             digest: None,
                         }),
                         type_: None,
-                        optional: true,
+                        default_value: Some(DefaultParamVal::none()),
+                        labeled: true,
                         digest: None,
                     }],
                     body: Node {
@@ -3498,7 +3508,8 @@ const cylinder = startSketchOn('-XZ')
                                 digest: None,
                             }),
                             type_: None,
-                            optional: false,
+                            default_value: None,
+                            labeled: true,
                             digest: None,
                         },
                         Parameter {
@@ -3507,7 +3518,8 @@ const cylinder = startSketchOn('-XZ')
                                 digest: None,
                             }),
                             type_: None,
-                            optional: true,
+                            default_value: Some(DefaultParamVal::none()),
+                            labeled: true,
                             digest: None,
                         },
                     ],
