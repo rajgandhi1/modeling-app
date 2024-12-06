@@ -2110,6 +2110,7 @@ export class EngineCommandManager extends EventTarget {
   }
 
   deferredArtifactPopulated = deferExecution((a?: null) => {
+    console.log('populated')
     this.modelingSend({ type: 'Artifact graph populated' })
   }, 200)
   deferredArtifactEmptied = deferExecution((a?: null) => {

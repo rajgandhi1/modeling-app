@@ -984,6 +984,7 @@ export const modelingMachine = setup({
         })
     },
     'show default planes': () => {
+      console.log('show default planes')
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
       kclManager.showPlanes()
     },
@@ -1682,8 +1683,10 @@ export const modelingMachine = setup({
         },
 
         showPlanes: {
+          reenter: true,
           on: {
             'Artifact graph emptied': 'hidePlanes',
+            'Artifact graph populated': 'showPlanes',
           },
 
           entry: [
