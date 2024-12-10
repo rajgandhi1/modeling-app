@@ -200,7 +200,10 @@ function CoreDump() {
     () => new CoreDumpManager(engineCommandManager, codeManager, token),
     []
   )
-  useHotkeyWrapper(['mod + shift + .'], () => {
+  // TODO: revisit once progress is made on upstream issue
+  // https://github.com/JohannesKlauss/react-hotkeys-hook/issues/1064
+  // const hotkey = process.platform !== 'linux' ? 'mod + shift + .' : 'mod + shift + >'
+  useHotkeyWrapper(['mod + shift + .', 'mod + shift + >'], () => {
     toast
       .promise(
         coreDump(coreDumpManager, true),
