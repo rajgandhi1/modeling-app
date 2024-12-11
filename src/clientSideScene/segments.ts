@@ -47,6 +47,7 @@ import {
   ARROWHEAD,
   DRAFT_POINT,
   SceneInfra,
+  SEGMENT_INPUT_LENGTH_LABEL,
   SEGMENT_LENGTH_LABEL,
   SEGMENT_LENGTH_LABEL_OFFSET_PX,
   SEGMENT_LENGTH_LABEL_TEXT,
@@ -175,6 +176,14 @@ class StraightSegment implements SegmentUtils {
       })
       segmentGroup.add(arrowGroup)
       segmentGroup.add(lengthIndicatorGroup)
+
+      const inputGroup = createInputLengthIndicator({
+        from,
+        to,
+        scale,
+      })
+
+      segmentGroup.add(inputGroup)
     }
 
     segmentGroup.add(mesh, extraSegmentGroup)
@@ -209,6 +218,7 @@ class StraightSegment implements SegmentUtils {
     shape.lineTo(0, (SEGMENT_WIDTH_PX / 2) * scale)
     const arrowGroup = group.getObjectByName(ARROWHEAD) as Group
     const labelGroup = group.getObjectByName(SEGMENT_LENGTH_LABEL) as Group
+    const inputGroup = group.getObjectByName('segment-input-group') as Group
 
     const length = Math.sqrt(
       Math.pow(to[0] - from[0], 2) + Math.pow(to[1] - from[1], 2)
@@ -268,6 +278,26 @@ class StraightSegment implements SegmentUtils {
       label.style.setProperty('--x', `0px`)
       label.style.setProperty('--y', `0px`)
       labelWrapper.position.set((from[0] + to[0]) / 2, (from[1] + to[1]) / 2, 0)
+      labelGroup.visible = isHandlesVisible
+    }
+
+    if (inputGroup) {
+      const css2dObjectSegmentInput = inputGroup.getObjectByName(
+        'segment-input'
+      ) as CSS2DObject
+
+      const div = css2dObjectSegmentInput.element
+      const input = div.children[0] as HTMLInputElement
+      const slope = (to[1] - from[1]) / (to[0] - from[0])
+      let slopeAngle = ((Math.atan(slope) * 180) / Math.PI) * -1
+      input.style.setProperty('--degree', `${slopeAngle}deg`)
+      input.style.setProperty('--x', `0px`)
+      input.style.setProperty('--y', `0px`)
+      css2dObjectSegmentInput.position.set(
+        (from[0] + to[0]) / 2,
+        (from[1] + to[1]) / 2,
+        0
+      )
       labelGroup.visible = isHandlesVisible
     }
 
@@ -798,6 +828,41 @@ function createExtraSegmentHandle(
   extraSegmentGroup.add(particle)
   extraSegmentGroup.scale.set(scale, scale, scale)
   return extraSegmentGroup
+}
+
+function createInputLengthIndicator({
+  from,
+  to,
+  scale,
+  length = 0.1,
+}: {
+  from: Coords2d
+  to: Coords2d
+  scale: number
+  length?: number
+}) {
+  const inputLengthIndicatorGroup = new Group()
+  inputLengthIndicatorGroup.name = 'segment-input-group'
+  const div = document.createElement('div')
+  const input = document.createElement('input')
+  input.classList.add('segment-input')
+
+  div.style.position = 'absolute'
+  div.appendChild(input)
+
+  input.placeholder = roundOff(length).toString()
+  const css2dObject = new CSS2DObject(div)
+  css2dObject.name = 'segment-input'
+
+  const offsetFromMidpoint = new Vector2(to[0] - from[0], to[1] - from[1])
+    .normalize()
+    .rotateAround(new Vector2(0, 0), -Math.PI / 2)
+    .multiplyScalar(SEGMENT_LENGTH_LABEL_OFFSET_PX * scale)
+  input.style.setProperty('--x', `${offsetFromMidpoint.x}px`)
+  input.style.setProperty('--y', `${offsetFromMidpoint.y}px`)
+
+  inputLengthIndicatorGroup.add(css2dObject)
+  return inputLengthIndicatorGroup
 }
 
 /**

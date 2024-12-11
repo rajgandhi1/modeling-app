@@ -62,6 +62,7 @@ export const ARROWHEAD = 'arrowhead'
 export const SEGMENT_LENGTH_LABEL = 'segment-length-label'
 export const SEGMENT_LENGTH_LABEL_TEXT = 'segment-length-label-text'
 export const SEGMENT_LENGTH_LABEL_OFFSET_PX = 30
+export const SEGMENT_INPUT_LENGTH_LABEL = 'segment-input-length-label'
 
 export interface OnMouseEnterLeaveArgs {
   selected: Object3D<Object3DEventMap>
