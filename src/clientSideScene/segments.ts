@@ -298,7 +298,7 @@ class StraightSegment implements SegmentUtils {
         (from[1] + to[1]) / 2,
         0
       )
-      labelGroup.visible = isHandlesVisible
+      inputGroup.visible = false
     }
 
     const straightSegmentBody = group.children.find(
