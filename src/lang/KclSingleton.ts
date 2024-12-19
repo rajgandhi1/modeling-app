@@ -290,6 +290,8 @@ export class KclManager {
       this.engineCommandManager.rejectAllModelingCommands(
         EXECUTE_AST_INTERRUPT_ERROR_MESSAGE
       )
+
+      console.log('always going to return')
       // Exit early if we are already executing.
       return
     }
@@ -301,75 +303,85 @@ export class KclManager {
     this._cancelTokens.set(currentExecutionId, false)
 
     this.isExecuting = true
-    await this.ensureWasmInit()
-    const { logs, errors, execState, isInterrupted } = await executeAst({
-      ast,
-      engineCommandManager: this.engineCommandManager,
-    })
+    try {
+      await this.ensureWasmInit()
 
-    // Program was not interrupted, setup the scene
-    // Do not send send scene commands if the program was interrupted, go to clean up
-    if (!isInterrupted) {
-      this.addDiagnostics(await lintAst({ ast: ast }))
-      setSelectionFilterToDefault(execState.memory, this.engineCommandManager)
+      console.log('I WILL BRICK ')
+      const { logs, errors, execState, isInterrupted } = await executeAst({
+        ast,
+        engineCommandManager: this.engineCommandManager,
+      })
+      console.log('I did the execute ast')
 
-      if (args.zoomToFit) {
-        let zoomObjectId: string | undefined = ''
-        if (args.zoomOnRangeAndType) {
-          zoomObjectId = this.engineCommandManager?.mapRangeToObjectId(
-            args.zoomOnRangeAndType.range,
-            args.zoomOnRangeAndType.type
-          )
+      // Program was not interrupted, setup the scene
+      // Do not send send scene commands if the program was interrupted, go to clean up
+      if (!isInterrupted) {
+        this.addDiagnostics(await lintAst({ ast: ast }))
+        setSelectionFilterToDefault(execState.memory, this.engineCommandManager)
+
+        if (args.zoomToFit) {
+          let zoomObjectId: string | undefined = ''
+          if (args.zoomOnRangeAndType) {
+            zoomObjectId = this.engineCommandManager?.mapRangeToObjectId(
+              args.zoomOnRangeAndType.range,
+              args.zoomOnRangeAndType.type
+            )
+          }
+
+          await this.engineCommandManager.sendSceneCommand({
+            type: 'modeling_cmd_req',
+            cmd_id: uuidv4(),
+            cmd: {
+              type: 'zoom_to_fit',
+              object_ids: zoomObjectId ? [zoomObjectId] : [], // leave empty to zoom to all objects
+              padding: 0.1, // padding around the objects
+              animated: false, // don't animate the zoom for now
+            },
+          })
         }
-
-        await this.engineCommandManager.sendSceneCommand({
-          type: 'modeling_cmd_req',
-          cmd_id: uuidv4(),
-          cmd: {
-            type: 'zoom_to_fit',
-            object_ids: zoomObjectId ? [zoomObjectId] : [], // leave empty to zoom to all objects
-            padding: 0.1, // padding around the objects
-            animated: false, // don't animate the zoom for now
-          },
-        })
       }
-    }
 
-    this.isExecuting = false
+      this.isExecuting = false
 
-    // Check the cancellation token for this execution before applying side effects
-    if (this._cancelTokens.get(currentExecutionId)) {
+      // Check the cancellation token for this execution before applying side effects
+      if (this._cancelTokens.get(currentExecutionId)) {
+        this._cancelTokens.delete(currentExecutionId)
+        return
+      }
+
+      // Exit sketch mode if the AST is empty
+      if (this._isAstEmpty(ast)) {
+        await this.disableSketchMode()
+      }
+
+      this.logs = logs
+      // Do not add the errors since the program was interrupted and the error is not a real KCL error
+      this.addDiagnostics(isInterrupted ? [] : kclErrorsToDiagnostics(errors))
+      this.execState = execState
+      if (!errors.length) {
+        this.lastSuccessfulProgramMemory = execState.memory
+      }
+      this.ast = { ...ast }
+      // updateArtifactGraph relies on updated executeState/programMemory
+      await this.engineCommandManager.updateArtifactGraph(this.ast)
+      this._executeCallback()
+      if (!isInterrupted) {
+        sceneInfra.modelingSend({ type: 'code edit during sketch' })
+      }
+
+      this.engineCommandManager.addCommandLog({
+        type: 'execution-done',
+        data: null,
+      })
+
       this._cancelTokens.delete(currentExecutionId)
-      return
+      markOnce('code/endExecuteAst')
+    } catch (e) {
+      console.error(e, 'ADFASDF')
+    } finally {
+      this.isExecuting = false
+      console.log('make sure it is off')
     }
-
-    // Exit sketch mode if the AST is empty
-    if (this._isAstEmpty(ast)) {
-      await this.disableSketchMode()
-    }
-
-    this.logs = logs
-    // Do not add the errors since the program was interrupted and the error is not a real KCL error
-    this.addDiagnostics(isInterrupted ? [] : kclErrorsToDiagnostics(errors))
-    this.execState = execState
-    if (!errors.length) {
-      this.lastSuccessfulProgramMemory = execState.memory
-    }
-    this.ast = { ...ast }
-    // updateArtifactGraph relies on updated executeState/programMemory
-    await this.engineCommandManager.updateArtifactGraph(this.ast)
-    this._executeCallback()
-    if (!isInterrupted) {
-      sceneInfra.modelingSend({ type: 'code edit during sketch' })
-    }
-
-    this.engineCommandManager.addCommandLog({
-      type: 'execution-done',
-      data: null,
-    })
-
-    this._cancelTokens.delete(currentExecutionId)
-    markOnce('code/endExecuteAst')
   }
   // NOTE: this always updates the code state and editor.
   // DO NOT CALL THIS from codemirror ever.
@@ -449,6 +461,7 @@ export class KclManager {
       return
     }
     this.ast = { ...ast }
+    console.log('GOT EM? - executeCode')
     return this.executeAst({ zoomToFit })
   }
   async format() {
@@ -532,11 +545,13 @@ export class KclManager {
     }
 
     if (execute) {
+      console.log('HERE!?')
       await this.executeAst({
         ast: astWithUpdatedSource,
         zoomToFit: optionalParams?.zoomToFit,
         zoomOnRangeAndType: optionalParams?.zoomOnRangeAndType,
       })
+      console.log('THERE!?')
     } else {
       // When we don't re-execute, we still want to update the program
       // memory with the new ast. So we will hit the mock executor

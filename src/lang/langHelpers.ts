@@ -62,11 +62,14 @@ export async function executeAst({
   isInterrupted: boolean
 }> {
   try {
+    console.log('pierre')
     const execState = await (programMemoryOverride
       ? enginelessExecutor(ast, programMemoryOverride)
       : _executor(ast, engineCommandManager))
+    console.log('kevin')
 
     await engineCommandManager.waitForAllCommands()
+    console.log('waiting for all commands')
 
     return {
       logs: [],
@@ -75,6 +78,7 @@ export async function executeAst({
       isInterrupted: false,
     }
   } catch (e: any) {
+    console.log('OKAY?', e)
     let isInterrupted = false
     if (e instanceof KCLError) {
       // Detect if it is a force interrupt error which is not a KCL processing error.
@@ -99,6 +103,8 @@ export async function executeAst({
         isInterrupted,
       }
     }
+  } finally {
+    console.log('FIALLY FINALLY IFNALLY')
   }
 }
 

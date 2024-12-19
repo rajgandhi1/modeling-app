@@ -523,14 +523,32 @@ export const _executor = async (
 
   try {
     let jsAppSettings = default_app_settings()
+    console.log('1')
     if (!TEST) {
       const lastSettingsSnapshot = await import(
         'components/SettingsAuthProvider'
       ).then((module) => module.lastSettingsContextSnapshot)
+
+      console.log('1.1')
       if (lastSettingsSnapshot) {
         jsAppSettings = getAllCurrentSettings(lastSettingsSnapshot)
+        console.log('1.2')
       }
+      console.log('1.3')
     }
+    console.log('2')
+    console.log(
+      'node:',
+      node,
+      'toRaw:',
+      programMemoryOverride?.toRaw(),
+      'jsAppSettings:',
+      jsAppSettings,
+      'engineCommandManager:',
+      engineCommandManager,
+      'fileSystemManager:',
+      fileSystemManager
+    )
     const execState: RawExecState = await execute(
       JSON.stringify(node),
       JSON.stringify(programMemoryOverride?.toRaw() || null),
@@ -538,6 +556,7 @@ export const _executor = async (
       engineCommandManager,
       fileSystemManager
     )
+    console.log('3')
     return execStateFromRaw(execState)
   } catch (e: any) {
     console.log(e)
@@ -550,6 +569,8 @@ export const _executor = async (
     )
 
     return Promise.reject(kclError)
+  } finally {
+    console.log('_executor finally')
   }
 }
 
@@ -572,9 +593,8 @@ export const makeDefaultPlanes = async (
   engineCommandManager: EngineCommandManager
 ): Promise<DefaultPlanes> => {
   try {
-    const planes: DefaultPlanes = await make_default_planes(
-      engineCommandManager
-    )
+    const planes: DefaultPlanes =
+      await make_default_planes(engineCommandManager)
     return planes
   } catch (e) {
     // TODO: do something real with the error.
