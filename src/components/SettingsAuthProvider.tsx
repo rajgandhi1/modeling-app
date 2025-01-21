@@ -37,7 +37,11 @@ import {
   loadAndValidateSettings,
 } from 'lib/settings/settingsUtils'
 import { reportRejection } from 'lib/trap'
-import { getAppSettingsFilePath } from 'lib/desktop'
+import {
+  getAppSettingsFilePath,
+  isPathAProjectSettingsFile,
+  isPathASettingsFile,
+} from 'lib/desktop'
 import { isDesktop } from 'lib/isDesktop'
 import { useFileSystemWatcher } from 'hooks/useFileSystemWatcher'
 import { codeManager } from 'lib/singletons'
@@ -146,7 +150,7 @@ export const SettingsAuthProviderBase = ({
           if (!('data' in event)) return
           const eventParts = event.type.replace(/^set./, '').split('.') as [
             keyof typeof settings,
-            string
+            string,
           ]
           const truncatedNewValue = event.data.value?.toString().slice(0, 28)
           const message =
@@ -227,7 +231,15 @@ export const SettingsAuthProviderBase = ({
   }, [])
 
   useFileSystemWatcher(
-    async (eventType: string) => {
+    async (eventType: string, path: string) => {
+      const exitEarly = !(
+        isPathASettingsFile(path) || isPathAProjectSettingsFile(path)
+      )
+      if (exitEarly) {
+        // The file is not a settings file, exit early!
+        return
+      }
+
       // If there is a projectPath but it no longer exists it means
       // it was exterally removed. If we let the code past this condition
       // execute it will recreate the directory due to code in
