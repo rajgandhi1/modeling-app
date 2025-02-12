@@ -45,8 +45,8 @@ export const PERSIST_MODELING_CONTEXT = 'persistModelingContext'
 export const deg = (Math.PI * 2) / 360
 
 export const commonPoints = {
-  startAt: '[7.19, -9.7]',
-  num1: 7.25,
+  startAt: '[52.62, -70.98]',
+  num1: 53.11,
   num2: 14.44,
   /** The Y-value of a common lineTo move we perform in tests */
   num3: -2.44,
@@ -1032,8 +1032,8 @@ function failOnConsoleErrors(page: Page, testInfo?: TestInfo) {
         // Fail when running on CI and FAIL_ON_CONSOLE_ERRORS is set
         // use expect to prevent page from closing and not cleaning up
         expect(`An error was detected in the console: \r\n message:${exception.message} \r\n name:${exception.name} \r\n stack:${exception.stack}
-          
-          *Either fix the console error or add it to the whitelist defined in ./lib/console-error-whitelist.ts (if the error can be safely ignored)       
+
+          *Either fix the console error or add it to the whitelist defined in ./lib/console-error-whitelist.ts (if the error can be safely ignored)
           `).toEqual('Console error detected')
       } else {
         // the (test-results/exceptions.txt) file will be uploaded as part of an upload artifact in GH

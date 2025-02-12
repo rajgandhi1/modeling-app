@@ -140,7 +140,7 @@ async function doBasicSketch(
   await expect(u.codeLocator).toHaveText(`sketch001 = startSketchOn('XZ')
   |> startProfileAt(${commonPoints.startAt}, %)
   |> xLine(${commonPoints.num1}, %, $seg01)
-  |> yLine(${commonPoints.num1 + 0.01}, %)
+  |> yLine(${commonPoints.num1}, %)
   |> xLine(-segLen(seg01), %)`)
 }
 
