@@ -534,21 +534,21 @@ sketch002 = startSketchOn(extrude001, seg03)
         viewPortSize.width * 0.75,
         viewPortSize.height / 2 - 3, // 3px off the X-axis
       ],
-      kcl: [20.34, 0],
+      kcl: [148.92, 0],
     } as const
     const offYAxis = {
       screen: [
         viewPortSize.width * 0.6, // Well off the Y-axis, out of snapping range
         viewPortSize.height * 0.3,
       ],
-      kcl: [8.14, 6.78],
+      kcl: [59.57, 49.64],
     } as const
     const yAxisSloppy = {
       screen: [
         viewPortSize.width / 2 + 5, // 5px off the Y-axis
         viewPortSize.height * 0.3,
       ],
-      kcl: [0, 6.78],
+      kcl: [0, 49.64],
     } as const
     const [clickOnXzPlane, moveToXzPlane] = scene.makeMouseHelpers(...xzPlane)
     const [clickOriginSloppy] = scene.makeMouseHelpers(...originSloppy.screen)
