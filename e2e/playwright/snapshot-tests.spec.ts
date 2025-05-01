@@ -1145,21 +1145,13 @@ sweepSketch = startSketchOn(XY)
      )
 `
       )
-      localStorage.setItem(
-        'store',
-        JSON.stringify({
-          state: {
-            openPanes: [],
-          },
-          version: 0,
-        })
-      )
     })
 
     await page.setViewportSize({ width: 1200, height: 1000 })
     await u.waitForAuthSkipAppStart()
 
     await scene.settled(cmdBar)
+    await editor.closePane()
     await editor.openPane()
 
     await expect(page, 'expect small color widget').toHaveScreenshot({
@@ -1201,21 +1193,13 @@ sweepSketch = startSketchOn(XY)
      )
 `
       )
-      localStorage.setItem(
-        'store',
-        JSON.stringify({
-          state: {
-            openPanes: [],
-          },
-          version: 0,
-        })
-      )
     })
 
     await page.setViewportSize({ width: 1200, height: 1000 })
     await u.waitForAuthSkipAppStart()
 
     await scene.settled(cmdBar)
+    await editor.closePane()
     await editor.openPane()
 
     await expect(page.locator('.cm-css-color-picker-wrapper')).toBeVisible()
