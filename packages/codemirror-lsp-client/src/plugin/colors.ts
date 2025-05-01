@@ -1,16 +1,27 @@
-import { StateEffect, type Extension, type Range } from '@codemirror/state'
-import type { DecorationSet, ViewUpdate } from '@codemirror/view'
+import {
+  StateEffect,
+  StateField,
+  type Extension,
+  type Range,
+} from '@codemirror/state'
 import {
   Decoration,
+  type DecorationSet,
   EditorView,
   ViewPlugin,
   WidgetType,
+  type ViewUpdate,
 } from '@codemirror/view'
+
 import type { LanguageServerPlugin } from './lsp'
 import { lspColorUpdateEvent } from './annotation'
 import { isArray } from '../lib/utils'
 import { offsetToPos, posToOffset, posToOffsetOrZero } from './util'
 import type * as LSP from 'vscode-languageserver-protocol'
+
+/* ------------------------------------------------------------------ */
+/* ----------  original helpers / widget / color utilities  ---------- */
+/* ------------------------------------------------------------------ */
 
 interface PickerState {
   from: number
@@ -54,31 +65,16 @@ async function discoverColorsViaLsp(
   plugin: LanguageServerPlugin
 ): Promise<WidgetOptions | Array<WidgetOptions> | null> {
   const responses = await plugin.requestDocumentColors()
+  if (!responses) return null
 
-  if (!responses) {
-    return null
-  }
-
-  let colors: Array<WidgetOptions> = []
+  const colors: Array<WidgetOptions> = []
   for (const color of responses) {
-    if (!color.range) {
-      continue
-    }
+    if (!color.range || !color.color) continue
 
     const { start, end } = color.range
-
-    let from = posToOffset(view.state.doc, start)
-    let to = posToOffset(view.state.doc, end)
-    if (from === null) return null
-    if (to === null) return null
-
-    if (!from || !to) {
-      continue
-    }
-
-    if (!color.color) {
-      continue
-    }
+    const from = posToOffset(view.state.doc, start)
+    const to = posToOffset(view.state.doc, end)
+    if (from == null || to == null) continue
 
     colors.push({
       color: rgbaToHex(color.color),
@@ -95,25 +91,11 @@ async function colorPickersDecorations(
   plugin: LanguageServerPlugin
 ): Promise<DecorationSet> {
   const widgets: Array<Range<Decoration>> = []
+  const maybe = await discoverColorsViaLsp(view, plugin)
+  if (!maybe) return Decoration.none
 
-  const maybeWidgetOptions = await discoverColorsViaLsp(view, plugin)
-
-  if (!maybeWidgetOptions) {
-    return Decoration.none
-  }
-
-  if (!isArray(maybeWidgetOptions)) {
-    widgets.push(
-      Decoration.widget({
-        widget: new ColorPickerWidget(maybeWidgetOptions),
-        side: 1,
-      }).range(maybeWidgetOptions.from)
-    )
-
-    return Decoration.set(widgets)
-  }
-
-  for (const wo of maybeWidgetOptions) {
+  const optionsList = isArray(maybe) ? maybe : [maybe]
+  for (const wo of optionsList) {
     widgets.push(
       Decoration.widget({
         widget: new ColorPickerWidget(wo),
@@ -121,7 +103,6 @@ async function colorPickersDecorations(
       }).range(wo.from)
     )
   }
-
   return Decoration.set(widgets)
 }
 
@@ -155,7 +136,6 @@ class ColorPickerWidget extends WidgetType {
     const wrapper = document.createElement('span')
     wrapper.appendChild(picker)
     wrapper.className = wrapperClassName
-
     return wrapper
   }
 
@@ -179,66 +159,59 @@ export const colorPickerTheme = EditorView.baseTheme({
     width: '100%',
     padding: 0,
     border: 'none',
-    '&::-webkit-color-swatch-wrapper': {
-      padding: 0,
-    },
-    '&::-webkit-color-swatch': {
-      border: 'none',
-    },
-    '&::-moz-color-swatch': {
-      border: 'none',
-    },
+    '&::-webkit-color-swatch-wrapper': { padding: 0 },
+    '&::-webkit-color-swatch': { border: 'none' },
+    '&::-moz-color-swatch': { border: 'none' },
   },
 })
 
-// Define an effect for setting the decorations
-export const setColorPickerDecorations = StateEffect.define<DecorationSet>()
+/* ------------------------------------------------------------------ */
+/* -------------------  ✅  new state machinery  -------------------- */
+/* ------------------------------------------------------------------ */
+
+// Effect that carries a fresh DecorationSet
+const setColorDecorations = StateEffect.define<DecorationSet>()
+
+// Field that stores the current DecorationSet
+const colorDecorationsField = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(value, tr) {
+    value = value.map(tr.changes)
+    for (const e of tr.effects) if (e.is(setColorDecorations)) value = e.value
+    return value
+  },
+  provide: (f) => EditorView.decorations.from(f),
+})
+
+/* ------------------------------------------------------------------ */
+/* ------------------  original ViewPlugin, patched  ---------------- */
+/* ------------------------------------------------------------------ */
 
 export const makeColorPicker = (plugin: ViewPlugin<LanguageServerPlugin>) =>
   ViewPlugin.fromClass(
     class ColorPickerViewPlugin {
-      decorations: DecorationSet = Decoration.none
       plugin: LanguageServerPlugin | null
 
       constructor(view: EditorView) {
-        const value = view.plugin(plugin)
-        this.plugin = value
+        this.plugin = view.plugin(plugin)
         if (!this.plugin) return
+
+        // initial async load → dispatch decorations
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        colorPickersDecorations(view, this.plugin)
-          .then((decorations) => {
-            this.decorations = decorations
-            console.log('Color decorations:', this.decorations)
-
-            // Dispatch the decorations to the view
-            // HERE WE NEED TO DISPATCH THE DECORATIONS
-            // Dispatch the decorations to the view
-            // You can use a state effect to trigger an update of the decorations
-            view.dispatch({
-              effects: setColorPickerDecorations.of(this.decorations),
-            })
-
-            // Force the view to re-render
-            view.requestMeasure()
-          })
-          .catch((err) => {
-            console.error('Failed to update color decorations:', err)
-          })
+        colorPickersDecorations(view, this.plugin).then((deco) => {
+          view.dispatch({ effects: setColorDecorations.of(deco) })
+        })
       }
 
       async update(update: ViewUpdate) {
         if (!this.plugin) return
-
         if (!(update.docChanged || update.viewportChanged)) return
 
-        this.decorations = await colorPickersDecorations(
-          update.view,
-          this.plugin
-        )
+        const deco = await colorPickersDecorations(update.view, this.plugin)
+        update.view.dispatch({ effects: setColorDecorations.of(deco) })
       }
     },
     {
-      decorations: (v) => v.decorations,
       eventHandlers: {
         change: (e: Event, view: EditorView) => {
           // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -247,6 +220,10 @@ export const makeColorPicker = (plugin: ViewPlugin<LanguageServerPlugin>) =>
       },
     }
   )
+
+/* ------------------------------------------------------------------ */
+/* --------------------  unchanged event handler  ------------------- */
+/* ------------------------------------------------------------------ */
 
 async function colorPickerChange(
   e: Event,
@@ -259,64 +236,43 @@ async function colorPickerChange(
   const target = e.target as HTMLInputElement
   if (
     target.nodeName !== 'INPUT' ||
-    !target.parentElement ||
-    !target.parentElement.classList.contains(wrapperClassName)
-  ) {
+    !target.parentElement?.classList.contains(wrapperClassName)
+  )
     return false
-  }
 
   const data = pickerState.get(target)!
   const converted = target.value + data.alpha
-
-  const color = hexToRGBComponents(converted)
+  const [red, green, blue] = hexToRGBComponents(converted)
 
   const responses = await value.requestColorPresentation(
-    {
-      red: color[0],
-      green: color[1],
-      blue: color[2],
-      alpha: data.alpha,
-    },
+    { red, green, blue, alpha: data.alpha },
     {
       start: offsetToPos(view.state.doc, data.from),
       end: offsetToPos(view.state.doc, data.to),
     }
   )
-
-  if (!responses) {
-    return false
-  }
-
-  if (responses.length === 0) {
-    return false
-  }
+  if (!responses?.length) return false
 
   for (const resp of responses) {
-    let changes = {
-      from: data.from,
-      to: data.to,
-      insert: resp.label,
-    }
+    const changes = resp.textEdit
+      ? {
+          from: posToOffsetOrZero(view.state.doc, resp.textEdit.range.start),
+          to: posToOffsetOrZero(view.state.doc, resp.textEdit.range.end),
+          insert: resp.textEdit.newText,
+        }
+      : { from: data.from, to: data.to, insert: resp.label }
 
-    if (resp.textEdit) {
-      changes = {
-        from: posToOffsetOrZero(view.state.doc, resp.textEdit.range.start),
-        to: posToOffsetOrZero(view.state.doc, resp.textEdit.range.end),
-        insert: resp.textEdit.newText,
-      }
-    }
-
-    view.dispatch({
-      changes: changes,
-      annotations: [lspColorUpdateEvent],
-    })
+    view.dispatch({ changes, annotations: [lspColorUpdateEvent] })
   }
-
   return true
 }
+
+/* ------------------------------------------------------------------ */
+/* -------------------------  public API  --------------------------- */
+/* ------------------------------------------------------------------ */
 
 export default function lspColorsExt(
   plugin: ViewPlugin<LanguageServerPlugin>
 ): Extension {
-  return [makeColorPicker(plugin), colorPickerTheme]
+  return [colorDecorationsField, makeColorPicker(plugin), colorPickerTheme]
 }
