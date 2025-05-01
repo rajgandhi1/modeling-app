@@ -1157,6 +1157,11 @@ sweepSketch = startSketchOn(XY)
     await page.keyboard.press('End')
     // Press enter to create a new line.
     await page.keyboard.press('Enter')
+    await page.keyboard.type('test')
+    await page.keyboard.press('Backspace')
+    await page.keyboard.press('Backspace')
+    await page.keyboard.press('Backspace')
+    await page.keyboard.press('Backspace')
 
     await expect(page, 'expect small color widget').toHaveScreenshot({
       maxDiffPixels: 100,
@@ -1213,6 +1218,11 @@ sweepSketch = startSketchOn(XY)
     await page.keyboard.press('End')
     // Press enter to create a new line.
     await page.keyboard.press('Enter')
+    await page.keyboard.type('test')
+    await page.keyboard.press('Backspace')
+    await page.keyboard.press('Backspace')
+    await page.keyboard.press('Backspace')
+    await page.keyboard.press('Backspace')
 
     await expect(page.locator('.cm-css-color-picker-wrapper')).toBeVisible()
 
