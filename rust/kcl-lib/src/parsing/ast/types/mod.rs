@@ -401,7 +401,7 @@ impl Node<Program> {
             // Check if the string is a color.
             if let Some(c) = literal.value.is_color() {
                 let source_range = literal.as_source_range();
-                // We subtract 1 from either side becasuse of the "'s in the literal.
+                // We subtract 1 from either side because of the "'s in the literal.
                 let fixed_source_range = SourceRange::new(
                     source_range.start() + 1,
                     source_range.end() - 1,
