@@ -32,7 +32,7 @@ const pickerState = new WeakMap<HTMLInputElement, PickerState>()
 function rgbaToHex(color: LSP.Color): string {
   return `#${decimalToHex(color.red)}${decimalToHex(color.green)}${decimalToHex(
     color.blue
-  )}${decimalToHex(color.alpha)}`
+  )}`
 }
 
 function decimalToHex(decimal: number): string {
@@ -44,7 +44,7 @@ function hexToRGBComponents(hex: string): number[] {
   const r = hex.slice(1, 3)
   const g = hex.slice(3, 5)
   const b = hex.slice(5, 7)
-  return [parseInt(r, 16), parseInt(g, 16), parseInt(b, 16)]
+  return [parseInt(r, 16) /255, parseInt(g, 16)/255, parseInt(b, 16) /255]
 }
 
 async function discoverColorsViaLsp(
