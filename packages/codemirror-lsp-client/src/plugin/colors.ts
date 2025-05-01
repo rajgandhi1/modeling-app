@@ -1,4 +1,4 @@
-import type { Extension, Range } from '@codemirror/state'
+import { StateEffect, type Extension, type Range } from '@codemirror/state'
 import type { DecorationSet, ViewUpdate } from '@codemirror/view'
 import {
   Decoration,
@@ -30,21 +30,23 @@ export type ColorData = Omit<WidgetOptions, 'from' | 'to'>
 const pickerState = new WeakMap<HTMLInputElement, PickerState>()
 
 function rgbaToHex(color: LSP.Color): string {
-  return `#${decimalToHex(color.red)}${decimalToHex(color.green)}${decimalToHex(
-    color.blue
-  )}`
-}
-
-function decimalToHex(decimal: number): string {
-  const hex = decimal.toString(16)
-  return hex.length === 1 ? '0' + hex : hex
+  return (
+    '#' +
+    [color.red, color.green, color.blue]
+      .map((c) =>
+        Math.round(c * 255)
+          .toString(16)
+          .padStart(2, '0')
+      )
+      .join('')
+  )
 }
 
 function hexToRGBComponents(hex: string): number[] {
   const r = hex.slice(1, 3)
   const g = hex.slice(3, 5)
   const b = hex.slice(5, 7)
-  return [parseInt(r, 16) /255, parseInt(g, 16)/255, parseInt(b, 16) /255]
+  return [parseInt(r, 16) / 255, parseInt(g, 16) / 255, parseInt(b, 16) / 255]
 }
 
 async function discoverColorsViaLsp(
@@ -189,6 +191,9 @@ export const colorPickerTheme = EditorView.baseTheme({
   },
 })
 
+// Define an effect for setting the decorations
+export const setColorPickerDecorations = StateEffect.define<DecorationSet>()
+
 export const makeColorPicker = (plugin: ViewPlugin<LanguageServerPlugin>) =>
   ViewPlugin.fromClass(
     class ColorPickerViewPlugin {
@@ -199,9 +204,26 @@ export const makeColorPicker = (plugin: ViewPlugin<LanguageServerPlugin>) =>
         const value = view.plugin(plugin)
         this.plugin = value
         if (!this.plugin) return
-        colorPickersDecorations(view, this.plugin).then((decorations) => {
-          this.decorations = decorations
-        })
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+        colorPickersDecorations(view, this.plugin)
+          .then((decorations) => {
+            this.decorations = decorations
+            console.log('Color decorations:', this.decorations)
+
+            // Dispatch the decorations to the view
+            // HERE WE NEED TO DISPATCH THE DECORATIONS
+            // Dispatch the decorations to the view
+            // You can use a state effect to trigger an update of the decorations
+            view.dispatch({
+              effects: setColorPickerDecorations.of(this.decorations),
+            })
+
+            // Force the view to re-render
+            view.requestMeasure()
+          })
+          .catch((err) => {
+            console.error('Failed to update color decorations:', err)
+          })
       }
 
       async update(update: ViewUpdate) {
@@ -218,74 +240,80 @@ export const makeColorPicker = (plugin: ViewPlugin<LanguageServerPlugin>) =>
     {
       decorations: (v) => v.decorations,
       eventHandlers: {
-        change: async (e, view) => {
-          const value = view.plugin(plugin)
-          if (!value) return
-
-          const target = e.target as HTMLInputElement
-          if (
-            target.nodeName !== 'INPUT' ||
-            !target.parentElement ||
-            !target.parentElement.classList.contains(wrapperClassName)
-          ) {
-            return false
-          }
-
-          const data = pickerState.get(target)!
-          const converted = target.value + data.alpha
-
-          const color = hexToRGBComponents(converted)
-
-          const responses = await value.requestColorPresentation(
-            {
-              red: color[0],
-              green: color[1],
-              blue: color[2],
-              alpha: data.alpha,
-            },
-            {
-              start: offsetToPos(view.state.doc, data.from),
-              end: offsetToPos(view.state.doc, data.to),
-            }
-          )
-
-          if (!responses) {
-            return false
-          }
-
-          if (responses.length === 0) {
-            return false
-          }
-
-          for (const resp of responses) {
-            let changes = {
-              from: data.from,
-              to: data.to,
-              insert: resp.label,
-            }
-
-            if (resp.textEdit) {
-              changes = {
-                from: posToOffsetOrZero(
-                  view.state.doc,
-                  resp.textEdit.range.start
-                ),
-                to: posToOffsetOrZero(view.state.doc, resp.textEdit.range.end),
-                insert: resp.textEdit.newText,
-              }
-            }
-
-            view.dispatch({
-              changes: changes,
-              annotations: [lspColorUpdateEvent],
-            })
-          }
-
-          return true
+        change: (e: Event, view: EditorView) => {
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
+          colorPickerChange(e, view, plugin)
         },
       },
     }
   )
+
+async function colorPickerChange(
+  e: Event,
+  view: EditorView,
+  plugin: ViewPlugin<LanguageServerPlugin>
+): Promise<boolean> {
+  const value = view.plugin(plugin)
+  if (!value) return false
+
+  const target = e.target as HTMLInputElement
+  if (
+    target.nodeName !== 'INPUT' ||
+    !target.parentElement ||
+    !target.parentElement.classList.contains(wrapperClassName)
+  ) {
+    return false
+  }
+
+  const data = pickerState.get(target)!
+  const converted = target.value + data.alpha
+
+  const color = hexToRGBComponents(converted)
+
+  const responses = await value.requestColorPresentation(
+    {
+      red: color[0],
+      green: color[1],
+      blue: color[2],
+      alpha: data.alpha,
+    },
+    {
+      start: offsetToPos(view.state.doc, data.from),
+      end: offsetToPos(view.state.doc, data.to),
+    }
+  )
+
+  if (!responses) {
+    return false
+  }
+
+  if (responses.length === 0) {
+    return false
+  }
+
+  for (const resp of responses) {
+    let changes = {
+      from: data.from,
+      to: data.to,
+      insert: resp.label,
+    }
+
+    if (resp.textEdit) {
+      changes = {
+        from: posToOffsetOrZero(view.state.doc, resp.textEdit.range.start),
+        to: posToOffsetOrZero(view.state.doc, resp.textEdit.range.end),
+        insert: resp.textEdit.newText,
+      }
+    }
+
+    view.dispatch({
+      changes: changes,
+      annotations: [lspColorUpdateEvent],
+    })
+  }
+
+  return true
+}
 
 export default function lspColorsExt(
   plugin: ViewPlugin<LanguageServerPlugin>
