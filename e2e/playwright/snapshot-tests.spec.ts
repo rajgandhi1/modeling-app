@@ -1151,8 +1151,12 @@ sweepSketch = startSketchOn(XY)
     await u.waitForAuthSkipAppStart()
 
     await scene.settled(cmdBar)
-    await editor.closePane()
-    await editor.openPane()
+    // Go to the end of the code.
+    await page.keyboard.press('End')
+    // Go to the end of the line.
+    await page.keyboard.press('End')
+    // Press enter to create a new line.
+    await page.keyboard.press('Enter')
 
     await expect(page, 'expect small color widget').toHaveScreenshot({
       maxDiffPixels: 100,
@@ -1199,8 +1203,16 @@ sweepSketch = startSketchOn(XY)
     await u.waitForAuthSkipAppStart()
 
     await scene.settled(cmdBar)
-    await editor.closePane()
-    await editor.openPane()
+
+    // Click in the code editor.
+    await page.locator('.cm-content').click()
+
+    // Go to the end of the code.
+    await page.keyboard.press('End')
+    // Go to the end of the line.
+    await page.keyboard.press('End')
+    // Press enter to create a new line.
+    await page.keyboard.press('Enter')
 
     await expect(page.locator('.cm-css-color-picker-wrapper')).toBeVisible()
 
