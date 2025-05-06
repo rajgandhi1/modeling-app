@@ -1310,6 +1310,8 @@ impl ExecutorContext {
 
 #[cfg(test)]
 pub(crate) async fn parse_execute(code: &str) -> Result<ExecTestResults, KclError> {
+    #[cfg(target_arch = "wasm32")]
+    web_sys::console::log_1(&format!("PROJECT_DIRECTORY (parse_execute) NONE").into());
     parse_execute_with_project_dir(code, None).await
 }
 
@@ -1318,6 +1320,8 @@ pub(crate) async fn parse_execute_with_project_dir(
     code: &str,
     project_directory: Option<std::path::PathBuf>,
 ) -> Result<ExecTestResults, KclError> {
+    #[cfg(target_arch = "wasm32")]
+    web_sys::console::log_1(&format!("PROJECT_DIRECTORY (parse_execute_with_project_dir){:?}", project_directory).into());
     let program = crate::Program::parse_no_errs(code)?;
 
     let exec_ctxt = ExecutorContext {
