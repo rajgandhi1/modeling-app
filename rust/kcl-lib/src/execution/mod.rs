@@ -734,6 +734,8 @@ impl ExecutorContext {
             (program, exec_state, false, None)
         };
 
+        #[cfg(target_arch = "wasm32")]
+        web_sys::console::log_1(&format!("PROJECT_DIRECTORY (run cache){:?}", &self.settings.project_directory).into());
         let result = self
             .run_concurrent(&program, &mut exec_state, imports_info, preserve_mem)
             .await;
@@ -769,6 +771,8 @@ impl ExecutorContext {
         program: &crate::Program,
         exec_state: &mut ExecState,
     ) -> Result<(EnvironmentRef, Option<ModelingSessionData>), KclErrorWithOutputs> {
+        #[cfg(target_arch = "wasm32")]
+        web_sys::console::log_1(&format!("PROJECT_DIRECTORY (run){:?}", &self.settings.project_directory).into());
         self.run_concurrent(program, exec_state, None, false).await
     }
 
@@ -786,6 +790,8 @@ impl ExecutorContext {
         universe_info: Option<(Universe, UniverseMap)>,
         preserve_mem: bool,
     ) -> Result<(EnvironmentRef, Option<ModelingSessionData>), KclErrorWithOutputs> {
+        #[cfg(target_arch = "wasm32")]
+        web_sys::console::log_1(&format!("PROJECT_DIRECTORY (run_concurrent){:?}", &self.settings.project_directory).into());
         // Reuse our cached universe if we have one.
         #[allow(unused_variables)]
         let (universe, universe_map) = if let Some((universe, universe_map)) = universe_info {
@@ -1015,9 +1021,13 @@ impl ExecutorContext {
     ) -> Result<(Universe, UniverseMap), KclErrorWithOutputs> {
         exec_state.add_root_module_contents(program);
 
+        
         let mut universe = std::collections::HashMap::new();
 
         let default_planes = self.engine.get_default_planes().read().await.clone();
+
+        #[cfg(target_arch = "wasm32")]
+        web_sys::console::log_1(&format!("PROJECT_DIRECTORY GET UNI (ctx){:?}", &self.settings.project_directory).into());
 
         let root_imports = crate::walk::import_universe(
             self,

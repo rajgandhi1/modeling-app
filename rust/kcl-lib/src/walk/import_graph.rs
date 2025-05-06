@@ -186,6 +186,8 @@ pub(crate) async fn import_universe(
     out: &mut Universe,
     exec_state: &mut ExecState,
 ) -> Result<UniverseMap, KclError> {
+    #[cfg(target_arch = "wasm32")]
+    web_sys::console::log_1(&format!("PROJECT_DIRECTORY (import_universe){:?}", &ctx.settings.project_directory).into());
     let modules = import_dependencies(repr, ctx)?;
     let mut module_imports = HashMap::new();
     for (filename, import_stmt, module_path) in modules {
@@ -204,6 +206,9 @@ pub(crate) async fn import_universe(
         if out.contains_key(&filename) {
             continue;
         }
+
+        #[cfg(target_arch = "wasm32")]
+        web_sys::console::log_1(&format!("PROJECT_DIRECTORY (ctx){:?}", &ctx.settings.project_directory).into());
 
         let source_range = SourceRange::from(&import_stmt);
         let attrs = &import_stmt.outer_attrs;

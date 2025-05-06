@@ -188,6 +188,10 @@ impl ModulePath {
                 } else {
                     std::path::PathBuf::from(path)
                 };
+                #[cfg(target_arch = "wasm32")]
+                web_sys::console::log_1(&format!("PATH{:?}", path).into());
+                #[cfg(target_arch = "wasm32")]
+                web_sys::console::log_1(&format!("RESOLVED{:?}", resolved_path).into());
                 ModulePath::Local { value: resolved_path }
             }
             ImportPath::Std { path } => {

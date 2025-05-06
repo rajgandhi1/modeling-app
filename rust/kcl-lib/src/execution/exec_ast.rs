@@ -428,6 +428,8 @@ impl ExecutorContext {
         exec_state: &mut ExecState,
         source_range: SourceRange,
     ) -> Result<ModuleId, KclError> {
+        #[cfg(target_arch = "wasm32")]
+        web_sys::console::log_1(&format!("PROJECT_DIRECTORY{:?}", &self.settings.project_directory).into());
         let resolved_path = ModulePath::from_import_path(path, &self.settings.project_directory);
 
         match path {
