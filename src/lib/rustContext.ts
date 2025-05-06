@@ -80,6 +80,8 @@ export default class RustContext {
   ): Promise<ExecState> {
     const instance = await this._checkInstance()
 
+    console.log("uh oh", settings)
+    console.log("uh oh JSON", JSON.stringify(settings))
     try {
       const result = await instance.execute(
         JSON.stringify(node),
