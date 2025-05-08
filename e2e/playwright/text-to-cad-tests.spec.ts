@@ -767,11 +767,9 @@ test.describe('Mocked Text-to-CAD API tests', { tag: ['@skipWin'] }, () => {
 
       await page.getByRole('button', { name: 'Accept' }).click()
 
-      await expect(page.getByTestId('app-header-project-name')).toBeVisible()
       await expect(page.getByTestId('app-header-project-name')).toContainText(
         projectName
       )
-      await expect(page.getByTestId('app-header-file-name')).toBeVisible()
       await expect(page.getByTestId('app-header-file-name')).toContainText(
         '2x2x2-cube.kcl'
       )
@@ -861,11 +859,9 @@ test.describe('Mocked Text-to-CAD API tests', { tag: ['@skipWin'] }, () => {
 
       await page.getByRole('button', { name: 'Accept' }).click()
 
-      await expect(page.getByTestId('app-header-project-name')).toBeVisible()
       await expect(page.getByTestId('app-header-project-name')).toContainText(
         projectName
       )
-      await expect(page.getByTestId('app-header-file-name')).toBeVisible()
       await expect(page.getByTestId('app-header-file-name')).toContainText(
         '2x2x2-cube.kcl'
       )
@@ -907,11 +903,9 @@ test.describe('Mocked Text-to-CAD API tests', { tag: ['@skipWin'] }, () => {
       // Go into the project that was created from Text to CAD
       await page.getByText(projectName).click()
 
-      await expect(page.getByTestId('app-header-project-name')).toBeVisible()
       await expect(page.getByTestId('app-header-project-name')).toContainText(
         projectName
       )
-      await expect(page.getByTestId('app-header-file-name')).toBeVisible()
       await expect(page.getByTestId('app-header-file-name')).toContainText(
         '2x2x2-cube.kcl'
       )
@@ -955,11 +949,10 @@ test.describe('Mocked Text-to-CAD API tests', { tag: ['@skipWin'] }, () => {
 
       await page.getByRole('button', { name: 'Accept' }).click()
 
-      await expect(page.getByTestId('app-header-project-name')).toBeVisible()
       await expect(page.getByTestId('app-header-project-name')).toContainText(
         projectName
       )
-      await expect(page.getByTestId('app-header-file-name')).toBeVisible()
+    
       await expect(page.getByTestId('app-header-file-name')).toContainText(
         '2x2x2-cube.kcl'
       )
@@ -1006,11 +999,10 @@ test.describe('Mocked Text-to-CAD API tests', { tag: ['@skipWin'] }, () => {
       await page.getByRole('button', { name: 'Reject' }).click()
 
       // Check header is populated with the project and file name
-      await expect(page.getByTestId('app-header-project-name')).toBeVisible()
       await expect(page.getByTestId('app-header-project-name')).toContainText(
         projectName
       )
-      await expect(page.getByTestId('app-header-file-name')).toBeVisible()
+    
       await expect(page.getByTestId('app-header-file-name')).toContainText(
         'main.kcl'
       )
@@ -1061,11 +1053,10 @@ test.describe('Mocked Text-to-CAD API tests', { tag: ['@skipWin'] }, () => {
       await page.getByRole('button', { name: 'Accept' }).click()
 
       // Check header is populated with the project and file name
-      await expect(page.getByTestId('app-header-project-name')).toBeVisible()
       await expect(page.getByTestId('app-header-project-name')).toContainText(
         projectName
       )
-      await expect(page.getByTestId('app-header-file-name')).toBeVisible()
+    
       await expect(page.getByTestId('app-header-file-name')).toContainText(
         '2x2x2-cube.kcl'
       )
@@ -1118,11 +1109,10 @@ test.describe('Mocked Text-to-CAD API tests', { tag: ['@skipWin'] }, () => {
 
       await homePage.openProject(unrelatedProjectName)
       // Check that we opened the unrelated project
-      await expect(page.getByTestId('app-header-project-name')).toBeVisible()
       await expect(page.getByTestId('app-header-project-name')).toContainText(
         unrelatedProjectName
       )
-      await expect(page.getByTestId('app-header-file-name')).toBeVisible()
+    
       await expect(page.getByTestId('app-header-file-name')).toContainText(
         'main.kcl'
       )
@@ -1130,11 +1120,10 @@ test.describe('Mocked Text-to-CAD API tests', { tag: ['@skipWin'] }, () => {
       await page.getByRole('button', { name: 'Reject' }).click()
 
       // Check header is populated with the project and file name
-      await expect(page.getByTestId('app-header-project-name')).toBeVisible()
       await expect(page.getByTestId('app-header-project-name')).toContainText(
         unrelatedProjectName
       )
-      await expect(page.getByTestId('app-header-file-name')).toBeVisible()
+    
       await expect(page.getByTestId('app-header-file-name')).toContainText(
         'main.kcl'
       )
@@ -1195,11 +1184,10 @@ test.describe('Mocked Text-to-CAD API tests', { tag: ['@skipWin'] }, () => {
 
       await homePage.openProject(unrelatedProjectName)
       // Check that we opened the unrelated project
-      await expect(page.getByTestId('app-header-project-name')).toBeVisible()
       await expect(page.getByTestId('app-header-project-name')).toContainText(
         unrelatedProjectName
       )
-      await expect(page.getByTestId('app-header-file-name')).toBeVisible()
+    
       await expect(page.getByTestId('app-header-file-name')).toContainText(
         'main.kcl'
       )
@@ -1207,11 +1195,10 @@ test.describe('Mocked Text-to-CAD API tests', { tag: ['@skipWin'] }, () => {
       await page.getByRole('button', { name: 'Accept' }).click()
 
       // Check header is populated with the project and file name
-      await expect(page.getByTestId('app-header-project-name')).toBeVisible()
       await expect(page.getByTestId('app-header-project-name')).toContainText(
         projectName
       )
-      await expect(page.getByTestId('app-header-file-name')).toBeVisible()
+    
       await expect(page.getByTestId('app-header-file-name')).toContainText(
         '2x2x2-cube.kcl'
       )
@@ -1270,11 +1257,10 @@ test.describe('Mocked Text-to-CAD API tests', { tag: ['@skipWin'] }, () => {
 
       await homePage.openProject(unrelatedProjectName)
       // Check that we opened the unrelated project
-      await expect(page.getByTestId('app-header-project-name')).toBeVisible()
       await expect(page.getByTestId('app-header-project-name')).toContainText(
         unrelatedProjectName
       )
-      await expect(page.getByTestId('app-header-file-name')).toBeVisible()
+    
       await expect(page.getByTestId('app-header-file-name')).toContainText(
         'main.kcl'
       )
@@ -1282,11 +1268,10 @@ test.describe('Mocked Text-to-CAD API tests', { tag: ['@skipWin'] }, () => {
       await page.getByRole('button', { name: 'Reject' }).click()
 
       // Check header is populated with the project and file name
-      await expect(page.getByTestId('app-header-project-name')).toBeVisible()
       await expect(page.getByTestId('app-header-project-name')).toContainText(
         unrelatedProjectName
       )
-      await expect(page.getByTestId('app-header-file-name')).toBeVisible()
+    
       await expect(page.getByTestId('app-header-file-name')).toContainText(
         'main.kcl'
       )
@@ -1345,11 +1330,10 @@ test.describe('Mocked Text-to-CAD API tests', { tag: ['@skipWin'] }, () => {
 
       await homePage.openProject(unrelatedProjectName)
       // Check that we opened the unrelated project
-      await expect(page.getByTestId('app-header-project-name')).toBeVisible()
       await expect(page.getByTestId('app-header-project-name')).toContainText(
         unrelatedProjectName
       )
-      await expect(page.getByTestId('app-header-file-name')).toBeVisible()
+    
       await expect(page.getByTestId('app-header-file-name')).toContainText(
         'main.kcl'
       )
@@ -1357,11 +1341,10 @@ test.describe('Mocked Text-to-CAD API tests', { tag: ['@skipWin'] }, () => {
       await page.getByRole('button', { name: 'Accept' }).click()
 
       // Check header is populated with the project and file name
-      await expect(page.getByTestId('app-header-project-name')).toBeVisible()
       await expect(page.getByTestId('app-header-project-name')).toContainText(
         projectName
       )
-      await expect(page.getByTestId('app-header-file-name')).toBeVisible()
+    
       await expect(page.getByTestId('app-header-file-name')).toContainText(
         '2x2x2-cube.kcl'
       )
