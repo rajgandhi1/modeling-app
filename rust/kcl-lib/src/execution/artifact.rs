@@ -1091,6 +1091,9 @@ fn artifacts_to_update(
             let mut complementary_edges: Vec<_> = solid_info.info.complementary_edges.iter().collect();
             complementary_edges.sort_by_key(|(k, _)| *k);
             for (base_segment_id, edge_info) in complementary_edges {
+                if edge_info.adjacent_ids.len() < 2 {
+                    continue;
+                }
                 complementary_edge_map.insert(
                     // second element is the "next adjacent edge"
                     edge_info.adjacent_ids[1],
