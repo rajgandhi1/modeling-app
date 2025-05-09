@@ -1065,6 +1065,9 @@ fn artifacts_to_update(
             let OkModelingCmdResponse::Solid3dGetInfo(solid_info) = response else {
                 return Ok(Vec::new());
             };
+            // log out entire request and response
+            // println!("Solid3dGetInfo request: {:#?}", request);
+            // println!("Solid3dGetInfo response: {:#?}", solid_info);
             let Some(Artifact::Path(path)) = artifacts.get(&ArtifactId::new(request.object_id)) else {
                 return Ok(Vec::new());
             };
@@ -1190,49 +1193,54 @@ fn artifacts_to_update(
 
                 // part 2 add sweepEdges and segments
                 if let Some(complementary_edge) = complementary_edge_map.get(edge_id) {
+                    let existing_artifact = artifacts.get(&ArtifactId::new(*edge_id));
                     match complementary_edge.sweep_edge_type {
                         ComplementaryEdgeType::Adjacent => {
-                            return_arr.push(Artifact::SweepEdge(SweepEdge {
-                                id: edge_id.into(),
-                                sub_type: SweepEdgeSubType::Adjacent,
-                                cmd_id: artifact_command.cmd_id,
-                                common_surface_ids: face_ids.iter().map(|id| (*id).into()).collect(),
-                                seg_id: complementary_edge.base_segment_id.into(),
-                                sweep_id: path_sweep_id,
-                            }));
-                            if let Some(Artifact::Segment(prev_segment)) =
-                                artifacts.get(&ArtifactId::new(complementary_edge.base_segment_id))
-                            {
-                                let mut new_segment = prev_segment.clone();
-                                new_segment.edge_ids.push(edge_id.into());
-                                return_arr.push(Artifact::Segment(new_segment));
-                            }
-                            if let Some(Artifact::Sweep(sweep)) = artifacts.get(&path_sweep_id) {
-                                let mut new_sweep = sweep.clone();
-                                new_sweep.edge_ids.push(edge_id.into());
-                                return_arr.push(Artifact::Sweep(new_sweep));
+                            if existing_artifact == None {
+                                return_arr.push(Artifact::SweepEdge(SweepEdge {
+                                    id: edge_id.into(),
+                                    sub_type: SweepEdgeSubType::Adjacent,
+                                    cmd_id: artifact_command.cmd_id,
+                                    common_surface_ids: face_ids.iter().map(|id| (*id).into()).collect(),
+                                    seg_id: complementary_edge.base_segment_id.into(),
+                                    sweep_id: path_sweep_id,
+                                }));
+                                if let Some(Artifact::Segment(prev_segment)) =
+                                    artifacts.get(&ArtifactId::new(complementary_edge.base_segment_id))
+                                {
+                                    let mut new_segment = prev_segment.clone();
+                                    new_segment.edge_ids.push(edge_id.into());
+                                    return_arr.push(Artifact::Segment(new_segment));
+                                }
+                                if let Some(Artifact::Sweep(sweep)) = artifacts.get(&path_sweep_id) {
+                                    let mut new_sweep = sweep.clone();
+                                    new_sweep.edge_ids.push(edge_id.into());
+                                    return_arr.push(Artifact::Sweep(new_sweep));
+                                }
                             }
                         }
                         ComplementaryEdgeType::Opposite => {
-                            return_arr.push(Artifact::SweepEdge(SweepEdge {
-                                id: edge_id.into(),
-                                sub_type: SweepEdgeSubType::Opposite,
-                                cmd_id: artifact_command.cmd_id,
-                                common_surface_ids: face_ids.iter().map(|id| (*id).into()).collect(),
-                                seg_id: complementary_edge.base_segment_id.into(),
-                                sweep_id: path_sweep_id,
-                            }));
-                            if let Some(Artifact::Segment(prev_segment)) =
-                                artifacts.get(&ArtifactId::new(complementary_edge.base_segment_id))
-                            {
-                                let mut new_segment = prev_segment.clone();
-                                new_segment.edge_ids.push(edge_id.into());
-                                return_arr.push(Artifact::Segment(new_segment));
-                            }
-                            if let Some(Artifact::Sweep(sweep)) = artifacts.get(&path_sweep_id) {
-                                let mut new_sweep = sweep.clone();
-                                new_sweep.edge_ids.push(edge_id.into());
-                                return_arr.push(Artifact::Sweep(new_sweep));
+                            if existing_artifact == None {
+                                return_arr.push(Artifact::SweepEdge(SweepEdge {
+                                    id: edge_id.into(),
+                                    sub_type: SweepEdgeSubType::Opposite,
+                                    cmd_id: artifact_command.cmd_id,
+                                    common_surface_ids: face_ids.iter().map(|id| (*id).into()).collect(),
+                                    seg_id: complementary_edge.base_segment_id.into(),
+                                    sweep_id: path_sweep_id,
+                                }));
+                                if let Some(Artifact::Segment(prev_segment)) =
+                                    artifacts.get(&ArtifactId::new(complementary_edge.base_segment_id))
+                                {
+                                    let mut new_segment = prev_segment.clone();
+                                    new_segment.edge_ids.push(edge_id.into());
+                                    return_arr.push(Artifact::Segment(new_segment));
+                                }
+                                if let Some(Artifact::Sweep(sweep)) = artifacts.get(&path_sweep_id) {
+                                    let mut new_sweep = sweep.clone();
+                                    new_sweep.edge_ids.push(edge_id.into());
+                                    return_arr.push(Artifact::Sweep(new_sweep));
+                                }
                             }
                         }
                         ComplementaryEdgeType::Base => {
