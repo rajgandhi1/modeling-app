@@ -2080,7 +2080,7 @@ dependencies = [
 [[package]]
 name = "kittycad-modeling-cmds"
 version = "0.2.118"
-source = "git+https://github.com/kittycad/modeling-api?branch=ben/solid_info_2#a6fb370471656f7b4e2ff6fe9b3ba0ffa40443eb"
+source = "git+https://github.com/kittycad/modeling-api?branch=ben/solid_info_2#9de3f41f72d2b1af60464f3a5f18679cb9388372"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2105,7 +2105,7 @@ dependencies = [
 [[package]]
 name = "kittycad-modeling-cmds-macros"
 version = "0.1.12"
-source = "git+https://github.com/kittycad/modeling-api?branch=ben/solid_info_2#a6fb370471656f7b4e2ff6fe9b3ba0ffa40443eb"
+source = "git+https://github.com/kittycad/modeling-api?branch=ben/solid_info_2#9de3f41f72d2b1af60464f3a5f18679cb9388372"
 dependencies = [
  "kittycad-modeling-cmds-macros-impl",
  "proc-macro2",
@@ -2116,7 +2116,7 @@ dependencies = [
 [[package]]
 name = "kittycad-modeling-cmds-macros-impl"
 version = "0.1.13"
-source = "git+https://github.com/kittycad/modeling-api?branch=ben/solid_info_2#a6fb370471656f7b4e2ff6fe9b3ba0ffa40443eb"
+source = "git+https://github.com/kittycad/modeling-api?branch=ben/solid_info_2#9de3f41f72d2b1af60464f3a5f18679cb9388372"
 dependencies = [
  "proc-macro2",
  "quote",
