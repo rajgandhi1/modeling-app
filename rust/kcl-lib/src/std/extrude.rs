@@ -7,10 +7,9 @@ use kcl_derive_docs::stdlib;
 use kcmc::{
     each_cmd as mcmd,
     length_unit::LengthUnit,
-    ok_response::OkModelingCmdResponse,
     output::ExtrusionFaceInfo,
     shared::{ExtrusionFaceCapType, Opposite},
-    websocket::{ModelingCmdReq, OkWebSocketResponseData},
+    websocket::ModelingCmdReq,
     ModelingCmd,
 };
 use kittycad_modeling_cmds::{self as kcmc};
