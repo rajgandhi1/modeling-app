@@ -7,9 +7,10 @@ use kcl_derive_docs::stdlib;
 use kcmc::{
     each_cmd as mcmd,
     length_unit::LengthUnit,
+    ok_response::OkModelingCmdResponse,
     output::ExtrusionFaceInfo,
     shared::{ExtrusionFaceCapType, Opposite},
-    websocket::ModelingCmdReq,
+    websocket::{ModelingCmdReq, OkWebSocketResponseData},
     ModelingCmd,
 };
 use kittycad_modeling_cmds::{self as kcmc};
@@ -295,7 +296,10 @@ pub(crate) async fn do_post_extrude<'a>(
     #[cfg(feature = "artifact-graph")]
     args.batch_modeling_cmd(
         exec_state.next_uuid(),
-        ModelingCmd::from(mcmd::Solid3dGetInfo { object_id: sketch.id }),
+        ModelingCmd::from(mcmd::Solid3dGetInfo {
+            object_id: sketch.id,
+            edge_id: any_edge_id,
+        }),
     )
     .await?;
 
