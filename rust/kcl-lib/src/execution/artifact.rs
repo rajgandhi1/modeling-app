@@ -1187,17 +1187,23 @@ fn artifacts_to_update(
             let mut return_arr = Vec::new();
             for edge in &info.edges {
                 let edge_id = ArtifactId::new(edge.edge_id);
-                let Some(Artifact::Wall(wall)) = artifacts.get(&edge_id) else {
-                    return Ok(Vec::new());
+                let Some(Artifact::Segment(segment)) = artifacts.get(&edge_id) else {
+                    continue;
+                };
+                let Some(surface_id) = segment.surface_id else {
+                    continue;
+                };
+                let Some(Artifact::Wall(wall)) = artifacts.get(&surface_id) else {
+                    continue;
                 };
                 let Some(Artifact::Sweep(sweep)) = artifacts.get(&wall.sweep_id) else {
-                    return Ok(Vec::new());
+                    continue;
                 };
                 let Some(Artifact::Path(_)) = artifacts.get(&sweep.path_id) else {
-                    return Ok(Vec::new());
+                    continue;
                 };
                 let Some(Artifact::Segment(segment)) = artifacts.get(&edge_id) else {
-                    return Ok(Vec::new());
+                    continue;
                 };
 
                 if let Some(opposite_edge_id) = edge.opposite_edge_id {
