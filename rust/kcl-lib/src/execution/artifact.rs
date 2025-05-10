@@ -313,7 +313,7 @@ pub struct SweepEdge {
     pub sub_type: SweepEdgeSubType,
     pub seg_id: ArtifactId,
     pub cmd_id: uuid::Uuid,
-    pub sweep_ids: Vec<ArtifactId>,
+    pub sweep_id: ArtifactId,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub common_surface_ids: Vec<ArtifactId>,
 }
@@ -431,6 +431,9 @@ impl PartialOrd for Artifact {
             (Artifact::SweepEdge(a), Artifact::SweepEdge(b)) => {
                 if a.sub_type != b.sub_type {
                     return Some(a.sub_type.cmp(&b.sub_type));
+                }
+                if a.sweep_id != b.sweep_id {
+                    return Some(a.sweep_id.cmp(&b.sweep_id));
                 }
                 if a.cmd_id != b.cmd_id {
                     return Some(a.cmd_id.cmp(&b.cmd_id));
@@ -1212,7 +1215,7 @@ fn artifacts_to_update(
                         sub_type: SweepEdgeSubType::Opposite,
                         seg_id: edge_id,
                         cmd_id: artifact_command.cmd_id,
-                        sweep_ids: edge.opposite_face_ids.iter().map(|id| id.into()).collect(),
+                        sweep_id: sweep.id,
                         common_surface_ids: Vec::new(),
                     }));
                     let mut new_segment = segment.clone();
@@ -1221,6 +1224,9 @@ fn artifacts_to_update(
                     let mut new_sweep = sweep.clone();
                     new_sweep.edge_ids = vec![opposite_edge_id.into()];
                     return_arr.push(Artifact::Sweep(new_sweep));
+                    let mut new_wall = wall.clone();
+                    new_wall.edge_cut_edge_ids = vec![opposite_edge_id.into()];
+                    return_arr.push(Artifact::Wall(new_wall));
                 }
                 if let Some(adjacent_edge_id) = edge.adjacent_edge_id {
                     return_arr.push(Artifact::SweepEdge(SweepEdge {
@@ -1228,7 +1234,7 @@ fn artifacts_to_update(
                         sub_type: SweepEdgeSubType::Adjacent,
                         seg_id: edge_id,
                         cmd_id: artifact_command.cmd_id,
-                        sweep_ids: edge.adjacent_face_ids.iter().map(|id| id.into()).collect(),
+                        sweep_id: sweep.id,
                         common_surface_ids: Vec::new(),
                     }));
                     let mut new_segment = segment.clone();
@@ -1237,6 +1243,9 @@ fn artifacts_to_update(
                     let mut new_sweep = sweep.clone();
                     new_sweep.edge_ids = vec![adjacent_edge_id.into()];
                     return_arr.push(Artifact::Sweep(new_sweep));
+                    let mut new_wall = wall.clone();
+                    new_wall.edge_cut_edge_ids = vec![adjacent_edge_id.into()];
+                    return_arr.push(Artifact::Wall(new_wall));
                 }
             }
             return Ok(return_arr);
