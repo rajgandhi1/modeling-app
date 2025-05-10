@@ -1216,7 +1216,11 @@ fn artifacts_to_update(
                         seg_id: edge_id,
                         cmd_id: artifact_command.cmd_id,
                         sweep_id: sweep.id,
-                        common_surface_ids: Vec::new(),
+                        common_surface_ids: edge
+                            .opposite_face_ids
+                            .iter()
+                            .map(|face| ArtifactId::new(*face))
+                            .collect(),
                     }));
                     let mut new_segment = segment.clone();
                     new_segment.edge_ids = vec![opposite_edge_id.into()];
@@ -1235,7 +1239,11 @@ fn artifacts_to_update(
                         seg_id: edge_id,
                         cmd_id: artifact_command.cmd_id,
                         sweep_id: sweep.id,
-                        common_surface_ids: Vec::new(),
+                        common_surface_ids: edge
+                            .adjacent_face_ids
+                            .iter()
+                            .map(|face| ArtifactId::new(*face))
+                            .collect(),
                     }));
                     let mut new_segment = segment.clone();
                     new_segment.edge_ids = vec![adjacent_edge_id.into()];
