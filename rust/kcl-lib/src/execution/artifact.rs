@@ -1182,8 +1182,8 @@ fn artifacts_to_update(
             }
             return Ok(return_arr);
         }
-        ModelingCmd::Solid3dGetInfo(kcmc::Solid3dGetInfo { .. }) => {
-            let OkModelingCmdResponse::Solid3dGetInfo(info) = response else {
+        ModelingCmd::Solid3dGetAdjancencyInfo(kcmc::Solid3dGetAdjancencyInfo { .. }) => {
+            let OkModelingCmdResponse::Solid3dGetAdjancencyInfo(info) = response else {
                 return Ok(Vec::new());
             };
 
@@ -1209,50 +1209,42 @@ fn artifacts_to_update(
                     continue;
                 };
 
-                if let Some(opposite_edge_id) = edge.opposite_edge_id {
+                if let Some(opposite_info) = &edge.opposite_info {
                     return_arr.push(Artifact::SweepEdge(SweepEdge {
-                        id: opposite_edge_id.into(),
+                        id: opposite_info.edge_id.into(),
                         sub_type: SweepEdgeSubType::Opposite,
                         seg_id: edge_id,
                         cmd_id: artifact_command.cmd_id,
                         sweep_id: sweep.id,
-                        common_surface_ids: edge
-                            .opposite_face_ids
-                            .iter()
-                            .map(|face| ArtifactId::new(*face))
-                            .collect(),
+                        common_surface_ids: opposite_info.faces.iter().map(|face| ArtifactId::new(*face)).collect(),
                     }));
                     let mut new_segment = segment.clone();
-                    new_segment.edge_ids = vec![opposite_edge_id.into()];
+                    new_segment.edge_ids = vec![opposite_info.edge_id.into()];
                     return_arr.push(Artifact::Segment(new_segment));
                     let mut new_sweep = sweep.clone();
-                    new_sweep.edge_ids = vec![opposite_edge_id.into()];
+                    new_sweep.edge_ids = vec![opposite_info.edge_id.into()];
                     return_arr.push(Artifact::Sweep(new_sweep));
                     let mut new_wall = wall.clone();
-                    new_wall.edge_cut_edge_ids = vec![opposite_edge_id.into()];
+                    new_wall.edge_cut_edge_ids = vec![opposite_info.edge_id.into()];
                     return_arr.push(Artifact::Wall(new_wall));
                 }
-                if let Some(adjacent_edge_id) = edge.adjacent_edge_id {
+                if let Some(adjacent_info) = &edge.adjacent_info {
                     return_arr.push(Artifact::SweepEdge(SweepEdge {
-                        id: adjacent_edge_id.into(),
+                        id: adjacent_info.edge_id.into(),
                         sub_type: SweepEdgeSubType::Adjacent,
                         seg_id: edge_id,
                         cmd_id: artifact_command.cmd_id,
                         sweep_id: sweep.id,
-                        common_surface_ids: edge
-                            .adjacent_face_ids
-                            .iter()
-                            .map(|face| ArtifactId::new(*face))
-                            .collect(),
+                        common_surface_ids: adjacent_info.faces.iter().map(|face| ArtifactId::new(*face)).collect(),
                     }));
                     let mut new_segment = segment.clone();
-                    new_segment.edge_ids = vec![adjacent_edge_id.into()];
+                    new_segment.edge_ids = vec![adjacent_info.edge_id.into()];
                     return_arr.push(Artifact::Segment(new_segment));
                     let mut new_sweep = sweep.clone();
-                    new_sweep.edge_ids = vec![adjacent_edge_id.into()];
+                    new_sweep.edge_ids = vec![adjacent_info.edge_id.into()];
                     return_arr.push(Artifact::Sweep(new_sweep));
                     let mut new_wall = wall.clone();
-                    new_wall.edge_cut_edge_ids = vec![adjacent_edge_id.into()];
+                    new_wall.edge_cut_edge_ids = vec![adjacent_info.edge_id.into()];
                     return_arr.push(Artifact::Wall(new_wall));
                 }
             }

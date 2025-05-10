@@ -296,7 +296,7 @@ pub(crate) async fn do_post_extrude<'a>(
     #[cfg(feature = "artifact-graph")]
     args.batch_modeling_cmd(
         exec_state.next_uuid(),
-        ModelingCmd::from(mcmd::Solid3dGetInfo {
+        ModelingCmd::from(mcmd::Solid3dGetAdjancencyInfo {
             object_id: sketch.id,
             edge_id: any_edge_id,
         }),
