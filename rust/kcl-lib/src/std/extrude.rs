@@ -294,58 +294,42 @@ pub(crate) async fn do_post_extrude<'a>(
 
     // Only do this if we need the artifact graph.
     #[cfg(feature = "artifact-graph")]
-    args.batch_modeling_cmd(
-        exec_state.next_uuid(),
-        ModelingCmd::from(mcmd::Solid3dGetAdjancencyInfo {
-            object_id: sketch.id,
-            edge_id: any_edge_id,
-        }),
-    )
-    .await?;
-
-    // In case of a sectional sweep, empirically it looks that the first n faces that are yielded from the sweep
-    // are the ones that work with GetOppositeEdge and GetNextAdjacentEdge, aka the n sides in the sweep.
-    // So here we're figuring out that n number as yielded_sides_count here,
-    // making sure that circle() calls count but close() don't (no length)
-    #[cfg(feature = "artifact-graph")]
-    let count_of_first_set_of_faces_if_sectional = if sectional {
-        sketch
-            .paths
-            .iter()
-            .filter(|p| {
-                let is_circle = matches!(p, Path::Circle { .. });
-                let has_length = p.get_base().from != p.get_base().to;
-                is_circle || has_length
-            })
-            .count()
-    } else {
-        usize::MAX
-    };
-
-    // Only do this if we need the artifact graph.
-    #[cfg(feature = "artifact-graph")]
-    for (curve_id, _) in face_infos
-        .iter()
-        .filter(|face_info| face_info.cap == ExtrusionFaceCapType::None)
-        .filter_map(|face_info| {
-            if let (Some(curve_id), Some(face_id)) = (face_info.curve_id, face_info.face_id) {
-                Some((curve_id, face_id))
-            } else {
-                None
-            }
-        })
-        .take(count_of_first_set_of_faces_if_sectional)
     {
-        // Get faces for original edge
-        // Since this one is batched we can just run it.
-        args.batch_modeling_cmd(
-            exec_state.next_uuid(),
-            ModelingCmd::from(mcmd::Solid3dGetAllEdgeFaces {
-                edge_id: curve_id,
-                object_id: sketch.id,
-            }),
-        )
-        .await?;
+        // Getting the ids of a sectional sweep does not work well and we cannot guarantee that
+        // any of these call will not just fail.
+        if !sectional {
+            args.batch_modeling_cmd(
+                exec_state.next_uuid(),
+                ModelingCmd::from(mcmd::Solid3dGetAdjancencyInfo {
+                    object_id: sketch.id,
+                    edge_id: any_edge_id,
+                }),
+            )
+            .await?;
+
+            for (curve_id, _) in face_infos
+                .iter()
+                .filter(|face_info| face_info.cap == ExtrusionFaceCapType::None)
+                .filter_map(|face_info| {
+                    if let (Some(curve_id), Some(face_id)) = (face_info.curve_id, face_info.face_id) {
+                        Some((curve_id, face_id))
+                    } else {
+                        None
+                    }
+                })
+            {
+                // Get faces for original edge
+                // Since this one is batched we can just run it.
+                args.batch_modeling_cmd(
+                    exec_state.next_uuid(),
+                    ModelingCmd::from(mcmd::Solid3dGetAllEdgeFaces {
+                        edge_id: curve_id,
+                        object_id: sketch.id,
+                    }),
+                )
+                .await?;
+            }
+        }
     }
 
     let Faces {
