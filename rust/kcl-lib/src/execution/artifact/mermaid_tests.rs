@@ -294,9 +294,14 @@ impl ArtifactGraph {
         prefix: &str,
     ) -> std::fmt::Result {
         // For now, only showing the source range.
-        fn code_ref_display(code_ref: &CodeRef) -> [usize; 3] {
-            let range = code_ref.range;
-            [range.start(), range.end(), range.module_id().as_usize()]
+        fn code_ref_display(code_ref: &CodeRef) -> String {
+            if !code_ref.node_path.is_empty() {
+                // Prefer the NodePath if it exists.
+                format!("{:?}", code_ref.node_path.steps)
+            } else {
+                let range = code_ref.range;
+                format!("[{}, {}, {}]", range.start(), range.end(), range.module_id().as_usize())
+            }
         }
 
         match artifact {
