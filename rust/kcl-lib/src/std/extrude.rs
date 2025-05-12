@@ -300,7 +300,7 @@ pub(crate) async fn do_post_extrude<'a>(
         if !sectional {
             args.batch_modeling_cmd(
                 exec_state.next_uuid(),
-                ModelingCmd::from(mcmd::Solid3dGetAdjancencyInfo {
+                ModelingCmd::from(mcmd::Solid3dGetAdjacencyInfo {
                     object_id: sketch.id,
                     edge_id: any_edge_id,
                 }),

@@ -1182,8 +1182,8 @@ fn artifacts_to_update(
             }
             return Ok(return_arr);
         }
-        ModelingCmd::Solid3dGetAdjancencyInfo(kcmc::Solid3dGetAdjancencyInfo { .. }) => {
-            let OkModelingCmdResponse::Solid3dGetAdjancencyInfo(info) = response else {
+        ModelingCmd::Solid3dGetAdjacencyInfo(kcmc::Solid3dGetAdjacencyInfo { .. }) => {
+            let OkModelingCmdResponse::Solid3dGetAdjacencyInfo(info) = response else {
                 return Ok(Vec::new());
             };
 
