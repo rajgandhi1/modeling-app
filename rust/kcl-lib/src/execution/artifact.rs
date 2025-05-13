@@ -313,6 +313,9 @@ pub struct SweepEdge {
     pub sub_type: SweepEdgeSubType,
     pub seg_id: ArtifactId,
     pub cmd_id: uuid::Uuid,
+    // This is only used for sorting, not for the actual artifact.
+    #[serde(skip)]
+    pub index: usize,
     pub sweep_id: ArtifactId,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub common_surface_ids: Vec<ArtifactId>,
@@ -437,6 +440,9 @@ impl PartialOrd for Artifact {
                 }
                 if a.cmd_id != b.cmd_id {
                     return Some(a.cmd_id.cmp(&b.cmd_id));
+                }
+                if a.index != b.index {
+                    return Some(a.index.cmp(&b.index));
                 }
                 Some(a.id.cmp(&b.id))
             }
@@ -1188,7 +1194,7 @@ fn artifacts_to_update(
             };
 
             let mut return_arr = Vec::new();
-            for edge in &info.edges {
+            for (index, edge) in info.edges.iter().enumerate() {
                 let edge_id = ArtifactId::new(edge.edge_id);
                 let Some(Artifact::Segment(segment)) = artifacts.get(&edge_id) else {
                     continue;
@@ -1215,6 +1221,7 @@ fn artifacts_to_update(
                         sub_type: SweepEdgeSubType::Opposite,
                         seg_id: edge_id,
                         cmd_id: artifact_command.cmd_id,
+                        index,
                         sweep_id: sweep.id,
                         common_surface_ids: opposite_info.faces.iter().map(|face| ArtifactId::new(*face)).collect(),
                     }));
@@ -1234,6 +1241,7 @@ fn artifacts_to_update(
                         sub_type: SweepEdgeSubType::Adjacent,
                         seg_id: edge_id,
                         cmd_id: artifact_command.cmd_id,
+                        index,
                         sweep_id: sweep.id,
                         common_surface_ids: adjacent_info.faces.iter().map(|face| ArtifactId::new(*face)).collect(),
                     }));
