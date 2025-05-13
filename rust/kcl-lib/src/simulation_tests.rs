@@ -2767,6 +2767,7 @@ mod clone_w_fillets {
 
     /// Test that KCL is executed correctly.
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // turn on when https://github.com/KittyCAD/engine/pull/3380 is merged
     async fn kcl_test_execute() {
         super::execute(TEST_NAME, true).await
     }
@@ -2788,6 +2789,7 @@ mod clone_w_shell {
 
     /// Test that KCL is executed correctly.
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // turn on when https://github.com/KittyCAD/engine/pull/3380 is merged
     async fn kcl_test_execute() {
         super::execute(TEST_NAME, true).await
     }
